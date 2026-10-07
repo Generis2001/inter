@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Inter font ─────────────────────────────────────────────────────────── */
+:root {
+  font-family: 'Inter', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';          /* Inter optical features  */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Design tokens ────────────────────────────────────────────────────────
+   Primary: Cyan-Blue   #0EA5E9  (sky-500) → #06B6D4 (cyan-500)
+   The gradient flows from cyan-500 → sky-500, giving a clean "water" feel.
+───────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg: #f0f9ff;
+  --bg-gradient: linear-gradient(160deg, #e0f2fe 0%, #f0f9ff 40%, #ecfeff 100%);
+
+  /* Surfaces */
+  --surface: rgba(255, 255, 255, 0.75);
+  --surface-strong: rgba(255, 255, 255, 0.92);
+  --surface-muted: #f0f9ff;
+
+  /* Text */
+  --ink:   #0c1a2e;          /* near-black with a cyan undertone */
+  --ink-2: #1e3a4c;
+  --muted: #4b6475;
+  --subtle: #7a9aaa;
+
+  /* Borders */
+  --border:        rgba(6, 182, 212, 0.14);
+  --border-strong: rgba(6, 182, 212, 0.40);
+
+  /* Primary accent — cyan-sky gradient exposed as a solid and as a gradient */
+  --accent:         #0891b2;          /* cyan-600 — used for solid buttons */
+  --accent-light:   #06b6d4;          /* cyan-500 */
+  --accent-lighter: #cffafe;          /* cyan-100 — chip backgrounds etc.  */
+  --accent-hover:   #0e7490;          /* cyan-700 */
+  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
+
+  /* Focus ring */
+  --focus: rgba(6, 182, 212, 0.45);
+
+  /* Semantic */
+  --success: #059669;
+  --danger:  #dc2626;
+
+  /* Type scale helpers (used as utility classes below) */
+  --text-balance:  clamp(32px, 8vw, 40px);   /* 32–40 px / bold  */
+  --text-section:  clamp(20px, 5vw, 24px);   /* 20–24 px / semibold */
+  --text-body:     15px;                     /* 14–16 px / regular  */
+  --text-amount:   16px;                     /* 16 px / semibold    */
+  --text-support:  13px;                     /* 12–14 px / regular  */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: var(--text-body);
+  min-height: 100dvh;
+  background: var(--bg-gradient);
+  color: var(--ink);
+}
+
+/* ─── Utility font classes ────────────────────────────────────────────────── */
+
+/* Balance figures — 32–40 px / 800 */
+.balance-text {
+  font-family: 'Inter', sans-serif;
+  font-size: var(--text-balance);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+/* Section headings — 20–24 px / 600 */
+.section-heading {
+  font-family: 'Inter', sans-serif;
+  font-size: var(--text-section);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Transaction amounts — 16 px / 600 */
+.amount-text {
+  font-family: 'Inter', sans-serif;
+  font-size: var(--text-amount);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+/* Supporting / meta text — 12–14 px / 400 */
+.support-text {
+  font-family: 'Inter', sans-serif;
+  font-size: var(--text-support);
+  font-weight: 400;
+}
+
+/* Monospace addresses */
+.mono {
+  font-family: 'JetBrains Mono', Menlo, monospace;
+  font-size: 12px;
+}
+
+/* Keep .display as an alias for section-heading (used throughout codebase) */
+.display {
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.03em;
+}
+
+/* ─── Sonner toast overrides ─────────────────────────────────────────────── */
+[data-sonner-toaster] {
+  --normal-bg:     rgba(255, 255, 255, 0.94);
+  --normal-border: rgba(6, 182, 212, 0.18);
+  --normal-text:   #0c1a2e;
+}
