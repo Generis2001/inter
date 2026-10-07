@@ -67,7 +67,7 @@ async function loadOnchainFacts(): Promise<OnchainFactsModule> {
 /**
  * A chain is deployable here when Circle SCP names it and it is a testnet. The
  * SDK's faucet type rejects a mainnet enum, so a mainnet run could never fund
- * its wallet — `references/compass-deploy.md` owns the mainnet path.
+ * its wallet - `references/compass-deploy.md` owns the mainnet path.
  */
 function listSupportedChains(facts: OnchainFactsModule): string[] {
   return facts.ONCHAIN_CHAINS.flatMap((chain) => (chain.isTestnet && chain.scpBlockchain ? [chain.scpBlockchain] : []));
@@ -117,8 +117,8 @@ interface DeploymentEntry {
  * Top-level convenience fields (`contractAddress`, `network`,
  * `deployerWalletId`, `deployerAddress`) always reflect the MOST RECENT
  * deployment. They are duplicated from `contract_deployments[0]` so
- * downstream tooling — notably `contract-integration-tester`, which
- * reads this file at runtime — does not have to dig into an array, and
+ * downstream tooling - notably `contract-integration-tester`, which
+ * reads this file at runtime - does not have to dig into an array, and
  * so the canonical "what's the live address?" / "who can sign as
  * owner?" answers are one field lookup. The full deployment history
  * still lives in `contract_deployments[]` for multi-chain / re-deploy
@@ -188,7 +188,7 @@ function stringifyForLog(value: unknown): string {
     return '';
   }
 
-  // Avoid bare String(value) on unknown — plain objects stringify to
+  // Avoid bare String(value) on unknown - plain objects stringify to
   // `[object Object]` which is useless in logs and trips
   // @typescript-eslint/no-base-to-string in the sandbox lint config.
   try {
@@ -267,8 +267,8 @@ function assertNumbersSurviveJsonParse(value: unknown, path: string): void {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new Error(
       `Constructor arg ${path} (${value}) is not an exact integer. JSON numbers above ` +
-        `Number.MAX_SAFE_INTEGER are rounded on parse — 1000000000000000000000000 becomes ` +
-        `999999999999999983222784, and nothing downstream can tell — and Solidity has no fractional types. ` +
+        `Number.MAX_SAFE_INTEGER are rounded on parse - 1000000000000000000000000 becomes ` +
+        `999999999999999983222784, and nothing downstream can tell - and Solidity has no fractional types. ` +
         `Pass large integers as a decimal string instead, e.g. "1000000000000000000000000", which encodes exactly.`,
     );
   }
@@ -529,7 +529,7 @@ function upsertContractMetadata(input: {
      * `createContractExecutionTransaction` calls and the testnet guard
      * (`NETWORK.includes('TESTNET')`). Use the SDK enum form
      * (e.g. 'ARC-TESTNET'), not the human-readable display name
-     * 'Arc Testnet' — that one belongs in `contract_deployments[].chain`
+     * 'Arc Testnet' - that one belongs in `contract_deployments[].chain`
      * and `contract_network_and_links` where it appears as a label.
      */
     network: input.chain,
@@ -781,9 +781,9 @@ async function main(): Promise<void> {
     console.log('Skipping faucet funding.');
   }
 
-  // Don't pass `blockchain` here — the wallet already binds the chain, and
+  // Don't pass `blockchain` here - the wallet already binds the chain, and
   // the SCP API rejects the combination with "API parameter invalid".
-  // Don't pass `constructorSignature` either — the SCP API rejects it
+  // Don't pass `constructorSignature` either - the SCP API rejects it
   // combined with `abiJson` ("'abiJson' field cannot be present with:
   // ConstructorSignature"); `abiJson` + `constructorParameters` is enough.
   const feeEstimate = await scpClient.estimateContractDeploymentFee({
@@ -830,7 +830,7 @@ async function main(): Promise<void> {
    * undefined when --wallet-id is reused without --wallet-address (the
    * `--skip-funding` path). When absent, we omit the field entirely so
    * downstream mode detection (present ⇒ Mode 2, absent ⇒ Mode 1)
-   * works correctly — an empty string would be falsely truthy.
+   * works correctly - an empty string would be falsely truthy.
    */
   const { metadataPath, metadata } = upsertContractMetadata({
     name: options.name,

@@ -68,7 +68,7 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
               {tx.tokenSymbol}
             </span>
           </div>
-          {/* Transaction amount — 16px / semibold */}
+          {/* Transaction amount - 16px / semibold */}
           <span
             className="amount-text"
             style={{ color: isFailed ? 'var(--danger)' : isSent ? 'var(--ink)' : 'var(--success)' }}

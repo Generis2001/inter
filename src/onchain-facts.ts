@@ -1,5 +1,5 @@
 /*
- * Onchain facts for this app. GENERATED — do not edit.
+ * Onchain facts for this app. GENERATED - do not edit.
  *
  * Arc Studio writes this file from its onchain facts registry, so the values here are
  * the ones Arc Studio itself deploys and links against. Edits are overwritten.
@@ -554,7 +554,7 @@ export const ONCHAIN_CHAINS: readonly OnchainChain[] = FACTS.chains;
 
 export const TESTNET_ONCHAIN_CHAINS: readonly OnchainChain[] = FACTS.chains.filter((chain) => chain.isTestnet);
 
-/** CCTP and Gateway addresses differ by network kind (see networkKind) — mainnet differs from testnet. */
+/** CCTP and Gateway addresses differ by network kind (see networkKind) - mainnet differs from testnet. */
 export const EVM_PROTOCOL_CONTRACTS: readonly ProtocolContractFact[] = FACTS.protocolContracts;
 
 const BY_CHAIN_ID = new Map(ONCHAIN_CHAINS.map((chain) => [chain.chainId, chain]));
@@ -571,7 +571,7 @@ export function requireChain(chainId: number): OnchainChain {
   const chain = getChain(chainId);
 
   if (!chain) {
-    throw new Error('Unknown chain ID ' + chainId + ' — ask Arc Studio to add it to its onchain facts registry');
+    throw new Error('Unknown chain ID ' + chainId + ' - ask Arc Studio to add it to its onchain facts registry');
   }
 
   return chain;
@@ -586,7 +586,7 @@ export function requireChainByScpBlockchain(blockchain: string): OnchainChain {
 
   if (!chain) {
     throw new Error(
-      "No chain for SCP blockchain '" + blockchain + "' — ask Arc Studio to add it to its onchain facts registry",
+      "No chain for SCP blockchain '" + blockchain + "' - ask Arc Studio to add it to its onchain facts registry",
     );
   }
 
@@ -603,7 +603,7 @@ export function getProtocolContractByName(
 ): ProtocolContractFact | undefined {
   const matches = EVM_PROTOCOL_CONTRACTS.filter((contract) => contract.name === name);
   if (matches.length > 1 && networkKind === undefined) {
-    throw new Error('"' + name + '" has both a testnet and a mainnet address — pass networkKind to disambiguate');
+    throw new Error('"' + name + '" has both a testnet and a mainnet address - pass networkKind to disambiguate');
   }
   return matches.find((contract) => contract.networkKind === undefined || contract.networkKind === networkKind);
 }

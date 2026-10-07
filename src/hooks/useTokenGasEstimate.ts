@@ -37,7 +37,7 @@ export function useTokenGasEstimate(
     return { feeFormatted: '~0.001', feeAmount: undefined }
   }
 
-  // Arc native gas token IS USDC (18 dec) — convert to 6-dec display
+  // Arc native gas token IS USDC (18 dec) - convert to 6-dec display
   const feeNative = Amount.fromRaw(
     gasPrice * gasEstimate,
     gasTokenDecimalsFor(ARC_MAINNET_ID),

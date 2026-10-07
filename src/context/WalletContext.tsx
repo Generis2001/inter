@@ -1,5 +1,5 @@
 /**
- * ArcWallet Context — manages wallet lifecycle:
+ * ArcWallet Context - manages wallet lifecycle:
  * create, import, lock/unlock.
  * Private keys and mnemonics live ONLY in React state (memory).
  * Only the address is persisted (sessionStorage).
@@ -46,7 +46,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null)
   const [pendingAccount, setPendingAccount] = useState<ArcWalletAccount | null>(null)
 
-  // Restore session on mount (only the address — keys stay in memory)
+  // Restore session on mount (only the address - keys stay in memory)
   // We can only restore the address, not the keys.
   // If no session exists, stay on landing. Keys only live in memory.
   // eslint-disable-next-line -- initial state derived from sessionStorage, not from async effect

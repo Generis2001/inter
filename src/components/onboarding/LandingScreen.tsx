@@ -63,7 +63,7 @@ export function LandingScreen() {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.25 }}
           >
-            Arc — where USDC is the gas
+            Arc - where USDC is the gas
           </motion.p>
 
           {/* Feature chips */}

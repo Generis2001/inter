@@ -1,5 +1,5 @@
 /**
- * inter logo — two crossing arrows with a purple→blue gradient.
+ * inter logo - two crossing arrows with a purple→blue gradient.
  * Pass `size` (default 40) to scale the icon uniformly.
  */
 interface InterLogoProps {

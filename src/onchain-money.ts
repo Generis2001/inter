@@ -1,5 +1,5 @@
 /*
- * Money math for USDC amounts. GENERATED — do not edit.
+ * Money math for USDC amounts. GENERATED - do not edit.
  *
  * Arc Studio writes this file from its own source, so the rules here are the ones
  * Arc Studio itself is tested against. Edits are overwritten.
@@ -75,7 +75,7 @@ function absBigInt(value: bigint): bigint {
   return value < 0n ? -value : value;
 }
 
-/** Drops trailing zeros without a regex — a fixed-width scan avoids any backtracking risk. */
+/** Drops trailing zeros without a regex - a fixed-width scan avoids any backtracking risk. */
 function trimTrailingZeros(digits: string): string {
   let end = digits.length;
 
@@ -250,7 +250,7 @@ export class Amount {
       throw new AmountError(
         'PRECISION_LOSS',
         `Rescaling ${this.toString()} from ${this.decimals} to ${decimals} decimals would drop ` +
-          `${formatUnitsExact(remainder, this.decimals)} — pass 'trunc' to allow it`,
+          `${formatUnitsExact(remainder, this.decimals)} - pass 'trunc' to allow it`,
       );
     }
 
@@ -315,7 +315,7 @@ export class Amount {
     if (other.decimals !== this.decimals) {
       throw new AmountError(
         'DECIMALS_MISMATCH',
-        `Cannot ${operation} a ${other.decimals}-decimal amount and a ${this.decimals}-decimal amount — ` +
+        `Cannot ${operation} a ${other.decimals}-decimal amount and a ${this.decimals}-decimal amount - ` +
           'rescale one with toDecimals() first',
       );
     }
@@ -390,7 +390,7 @@ function requireGasTokenIsUsdc(chainId: number): void {
 
     throw new AmountError(
       'GAS_TOKEN_IS_NOT_USDC',
-      `The gas token on ${chain.name} is ${chain.nativeCurrency.symbol}, not USDC — converting between it and ` +
+      `The gas token on ${chain.name} is ${chain.nativeCurrency.symbol}, not USDC - converting between it and ` +
         'USDC needs a price, not a rescale',
     );
   }

@@ -79,7 +79,7 @@ export function ImportWalletScreen() {
         >
           <AlertTriangle className="mt-0.5 size-4 shrink-0" style={{ color: 'var(--danger)' }} />
           <p className="text-xs" style={{ color: 'var(--muted)' }}>
-            Never share your recovery phrase or private key. ArcWallet processes this locally — it is never sent to any server.
+            Never share your recovery phrase or private key. ArcWallet processes this locally - it is never sent to any server.
           </p>
         </motion.div>
 

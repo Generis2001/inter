@@ -149,7 +149,7 @@ function usage(): string {
     '',
     '  Constructor args are a JSON array and are validated against the artifact ABI before anything',
     '  is spent. Use the literal "$DEPLOYER" for an owner/admin arg that must be the deployer wallet',
-    "  (--signer dcw, --mode verify|live) — the script substitutes the wallet address once it's known,",
+    "  (--signer dcw, --mode verify|live) - the script substitutes the wallet address once it's known,",
     '  so an owner-arg deploy no longer needs a throwaway run to discover it.',
     '',
     'Engines:',
@@ -157,7 +157,7 @@ function usage(): string {
     "                        user's DCW wallet broadcasts Create2Factory.deploy via Circle",
     '                        createContractExecutionTransaction (Circle-managed gas/nonce).',
     '  --signer private-key  path B: Compass broadcasts directly via viem with a raw key (non-custodial).',
-    '                        Reads the key from DEPLOYER_PRIVATE_KEY in .env — never a flag.',
+    '                        Reads the key from DEPLOYER_PRIVATE_KEY in .env - never a flag.',
     '',
     'Flags:',
     '  --artifact <path>        Foundry artifact (default: contracts/out/<Name>.sol/<Name>.json)',
@@ -169,7 +169,7 @@ function usage(): string {
     '  test against the same fork. Run it via execute_background, tail its redirected log for the',
     '  ready JSON, then kill_pid it when done (self-terminates after 20 minutes as a safety net).',
     "  The predicted address will NOT match a live A' deploy (different, throwaway deployer namespaces",
-    '  the salt) — this verifies the factory CONTRACT and target logic, not address parity.',
+    '  the salt) - this verifies the factory CONTRACT and target logic, not address parity.',
     '  A successful verify writes contracts/.compass-verify/<Name>.json, which --mode live requires.',
     '',
     '  --mode live REFUSES to broadcast unless that receipt exists and still matches this contract\'s',
@@ -180,8 +180,8 @@ function usage(): string {
     '  --wallet-address <addr>  address for the reused wallet',
     '  --factory <addr>         reuse an existing Create2Factory (dcw); omit to deploy one',
     '  --skip-funding           skip faucet funding (reused funded wallet)',
-    '  --blockchain <enum>      REQUIRED — Circle SDK blockchain enum (e.g. ARC-TESTNET, BASE-SEPOLIA)',
-    '  --compass-chain <id>     REQUIRED — Compass chain id (e.g. Arc_Testnet); resolves explorer/gas-token via the chain registry',
+    '  --blockchain <enum>      REQUIRED - Circle SDK blockchain enum (e.g. ARC-TESTNET, BASE-SEPOLIA)',
+    '  --compass-chain <id>     REQUIRED - Compass chain id (e.g. Arc_Testnet); resolves explorer/gas-token via the chain registry',
     '  --rpc <url>              fork + reads RPC for the target chain. Omit it and the script builds the',
     '                           keyed RPC-proxy URL from RPC_PROXY_BASE_URL / RPC_PROXY_TOKEN /',
     '                           RPC_PROXY_CHAINS in .env (required when the proxy does not cover the chain,',
@@ -201,7 +201,7 @@ function usage(): string {
     '  Owner-arg contract, one shot (verify writes the receipt, live consumes it):',
     '  bun run compass:deploy MyToken \'["$DEPLOYER"]\' --mode verify --blockchain ARC-TESTNET --compass-chain Arc_Testnet',
     '  bun run compass:deploy MyToken \'["$DEPLOYER"]\' --mode live   --blockchain ARC-TESTNET --compass-chain Arc_Testnet',
-    '  Mainnet (dcw only; user pre-funds the wallet — the testnet faucet cannot run there):',
+    '  Mainnet (dcw only; user pre-funds the wallet - the testnet faucet cannot run there):',
     '  bun run compass:deploy SimpleToken --mode live --blockchain <MainnetEnum> --compass-chain <MainnetChainId> --wallet-id <id> --wallet-address <addr> --skip-funding',
     '',
     'Environment variables:',
@@ -712,7 +712,7 @@ async function runForkRehearsal(config: unknown, options: CliOptions): Promise<s
         'constructor args before computing its CREATE2 address, so any non-empty constructor fails inside ' +
         'Compass rather than in your contract (traced upstream in crcl-main/compass, ' +
         'docs/proposals/evm-constructor-args-not-abi-encoded.md). The live broadcast below encodes the init code ' +
-        'itself and is unaffected, and the arg arity/encoding preflight already ran — but this run has NOT been ' +
+        'itself and is unaffected, and the arg arity/encoding preflight already ran - but this run has NOT been ' +
         `rehearsed on a fork. Use --mode verify for real pre-deploy verification. Detail: ${sanitizeForLog(error)}`,
     );
 
@@ -739,7 +739,7 @@ function writeVerifyReceipt(options: CliOptions, targetArtifact: CompiledArtifac
 
   fs.mkdirSync(`${CONTRACTS_ROOT_DIR}/.compass-verify`, { recursive: true });
   fs.writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
-  console.log(`Wrote fork-verify receipt to ${receiptPath} — a subsequent --mode live deploy will accept it.`);
+  console.log(`Wrote fork-verify receipt to ${receiptPath} - a subsequent --mode live deploy will accept it.`);
 }
 
 function readVerifyReceipt(contractName: string): ReturnType<typeof parseVerifyReceipt> {
@@ -759,7 +759,7 @@ function assertDeployerPlaceholderIsResolvable(options: CliOptions): void {
 
   if (options.signerKind !== 'dcw') {
     throw new Error(
-      `${DEPLOYER_PLACEHOLDER} is only supported with --signer dcw — the private-key path deploys from the ` +
+      `${DEPLOYER_PLACEHOLDER} is only supported with --signer dcw - the private-key path deploys from the ` +
         'DEPLOYER_PRIVATE_KEY EOA, so pass that address literally instead.',
     );
   }
@@ -799,7 +799,7 @@ function assertConstructorArgsEncode(options: CliOptions, targetArtifact: Compil
 
 function assertLiveDeployIsVerified(options: CliOptions, targetArtifact: CompiledArtifact): void {
   if (options.skipVerifyReason) {
-    console.log(`Skipping the fork-verify gate — reason given: ${options.skipVerifyReason}`);
+    console.log(`Skipping the fork-verify gate - reason given: ${options.skipVerifyReason}`);
     return;
   }
 
@@ -810,7 +810,7 @@ function assertLiveDeployIsVerified(options: CliOptions, targetArtifact: Compile
     fingerprint: computeVerifyFingerprint(targetArtifact, options.constructorArgs),
   });
 
-  console.log('Fork-verify receipt matches this contract and its constructor args — proceeding with the live deploy.');
+  console.log('Fork-verify receipt matches this contract and its constructor args - proceeding with the live deploy.');
 }
 
 async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifact): Promise<void> {
@@ -843,7 +843,7 @@ async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifac
     } catch (compassDryRunError) {
       console.warn(
         "Compass's own default-factory dry-run didn't produce an address (upstream limitation for " +
-          "contracts with constructor args — see docs/proposals in the compass repo) — continuing with " +
+          "contracts with constructor args - see docs/proposals in the compass repo) - continuing with " +
           `Arc Studio's own fork verification below. Detail: ${sanitizeForLog(compassDryRunError)}`,
       );
     }
@@ -858,7 +858,7 @@ async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifac
       throw new Error(
         `Fork verify: Compass's dry-run left the fork deployer ${account.address} unfunded. This mode depends on ` +
           'dryRun() funding the deployerKey it is handed, which is an undocumented internal pinned to ' +
-          'COMPASS_CANARY_VERSION — that pin has probably drifted. This is not a contract failure.',
+          'COMPASS_CANARY_VERSION - that pin has probably drifted. This is not a contract failure.',
       );
     }
 
@@ -893,7 +893,7 @@ async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifac
     );
     const predicted = predictCreate2Address(factory, salt, initcode);
 
-    console.log(`Broadcasting Create2Factory.deploy on the fork — predicted address ${predicted}...`);
+    console.log(`Broadcasting Create2Factory.deploy on the fork - predicted address ${predicted}...`);
     const factoryCallTxHash = await walletClient.writeContract({
       address: factory,
       abi: CREATE2_FACTORY_ABI,
@@ -906,7 +906,7 @@ async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifac
     if (factoryCallReceipt.status !== 'success') {
       throw new Error(
         `Fork verify: Create2Factory.deploy(${options.name}) REVERTED on the fork (tx ${factoryCallTxHash}). ` +
-          "This IS a contract failure — the constructor reverted with these args. Treat it as a suspected " +
+          "This IS a contract failure - the constructor reverted with these args. Treat it as a suspected " +
           'contract bug and fix the source or the constructor args; do NOT reroute to another deploy engine, ' +
           'which would broadcast the same reverting init code with real gas.',
       );
@@ -947,7 +947,7 @@ async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifac
     );
     console.log(redactRpcUrl(readyPayload));
     console.log(
-      `Fork verify ready — staying alive on ${forkRpcUrl} for the integration tester to attach. ` +
+      `Fork verify ready - staying alive on ${forkRpcUrl} for the integration tester to attach. ` +
         `Kill this process (kill_pid) once testing is done; it self-terminates after ${VERIFY_FORK_MAX_LIFETIME_MS / 60_000} minutes as a safety net.`,
     );
   } catch (error) {
@@ -969,7 +969,7 @@ async function verifyOnFork(options: CliOptions, targetArtifact: CompiledArtifac
 
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.once(signal, () => {
-      console.log(`Received ${signal} — shutting the verify fork down.`);
+      console.log(`Received ${signal} - shutting the verify fork down.`);
       void shutdownFork().finally(() => process.exit(0));
     });
   }
@@ -1243,7 +1243,7 @@ async function runCustodyDeploy(
   const initcodeHash = keccak256(initcode);
   const predicted = predictCreate2Address(factory, salt, initcode);
 
-  console.log(`A′ CREATE2 prediction — factory ${factory}, salt ${salt} → ${predicted}`);
+  console.log(`A′ CREATE2 prediction - factory ${factory}, salt ${salt} → ${predicted}`);
   if (forkPredicted) {
     console.log(
       `(Fork rehearsal used Compass's default factory → ${forkPredicted}; the live A′ address differs because ` +
@@ -1255,7 +1255,7 @@ async function runCustodyDeploy(
   let txHash: string | undefined;
 
   if (existing && existing !== '0x') {
-    console.log(`Contract already present at ${predicted} (idempotent CREATE2 re-run) — skipping broadcast.`);
+    console.log(`Contract already present at ${predicted} (idempotent CREATE2 re-run) - skipping broadcast.`);
   } else {
     console.log(
       `Broadcasting Create2Factory.deploy via Circle createContractExecutionTransaction (custody) on ${ACTIVE_CHAIN.chainLabel}...`,
@@ -1266,7 +1266,7 @@ async function runCustodyDeploy(
     if (!code || code === '0x') {
       throw new Error(
         `Broadcast completed (tx ${txHash ?? 'unknown'}) but no contract code found at the predicted CREATE2 address ${predicted} ` +
-          `after ${CODE_CONFIRM_ATTEMPTS} checks. The transaction may still be pending — verify tx ${txHash ?? 'unknown'} on ${ACTIVE_CHAIN.chainLabel} before rerunning.`,
+          `after ${CODE_CONFIRM_ATTEMPTS} checks. The transaction may still be pending - verify tx ${txHash ?? 'unknown'} on ${ACTIVE_CHAIN.chainLabel} before rerunning.`,
       );
     }
   }

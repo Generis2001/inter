@@ -135,7 +135,7 @@ export function NotificationPanel({
             style={{ background: 'rgba(0,0,0,0.12)' }}
           />
 
-          {/* Panel — slides in from top-right */}
+          {/* Panel - slides in from top-right */}
           <motion.div
             key="panel"
             ref={panelRef}

@@ -34,10 +34,10 @@
   --border:        rgba(6, 182, 212, 0.14);
   --border-strong: rgba(6, 182, 212, 0.40);
 
-  /* Primary accent — cyan-sky gradient exposed as a solid and as a gradient */
-  --accent:         #0891b2;          /* cyan-600 — used for solid buttons */
+  /* Primary accent - cyan-sky gradient exposed as a solid and as a gradient */
+  --accent:         #0891b2;          /* cyan-600 - used for solid buttons */
   --accent-light:   #06b6d4;          /* cyan-500 */
-  --accent-lighter: #cffafe;          /* cyan-100 — chip backgrounds etc.  */
+  --accent-lighter: #cffafe;          /* cyan-100 - chip backgrounds etc.  */
   --accent-hover:   #0e7490;          /* cyan-700 */
   --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
 
@@ -49,11 +49,11 @@
   --danger:  #dc2626;
 
   /* Type scale helpers (used as utility classes below) */
-  --text-balance:  clamp(32px, 8vw, 40px);   /* 32–40 px / bold  */
-  --text-section:  clamp(20px, 5vw, 24px);   /* 20–24 px / semibold */
-  --text-body:     15px;                     /* 14–16 px / regular  */
+  --text-balance:  clamp(32px, 8vw, 40px);   /* 32-40 px / bold  */
+  --text-section:  clamp(20px, 5vw, 24px);   /* 20-24 px / semibold */
+  --text-body:     15px;                     /* 14-16 px / regular  */
   --text-amount:   16px;                     /* 16 px / semibold    */
-  --text-support:  13px;                     /* 12–14 px / regular  */
+  --text-support:  13px;                     /* 12-14 px / regular  */
 }
 
 * { box-sizing: border-box; }
@@ -69,7 +69,7 @@ body {
 
 /* ─── Utility font classes ────────────────────────────────────────────────── */
 
-/* Balance figures — 32–40 px / 800 */
+/* Balance figures - 32-40 px / 800 */
 .balance-text {
   font-family: 'Inter', sans-serif;
   font-size: var(--text-balance);
@@ -78,7 +78,7 @@ body {
   line-height: 1;
 }
 
-/* Section headings — 20–24 px / 600 */
+/* Section headings - 20-24 px / 600 */
 .section-heading {
   font-family: 'Inter', sans-serif;
   font-size: var(--text-section);
@@ -86,7 +86,7 @@ body {
   letter-spacing: -0.02em;
 }
 
-/* Transaction amounts — 16 px / 600 */
+/* Transaction amounts - 16 px / 600 */
 .amount-text {
   font-family: 'Inter', sans-serif;
   font-size: var(--text-amount);
@@ -95,7 +95,7 @@ body {
   letter-spacing: -0.01em;
 }
 
-/* Supporting / meta text — 12–14 px / 400 */
+/* Supporting / meta text - 12-14 px / 400 */
 .support-text {
   font-family: 'Inter', sans-serif;
   font-size: var(--text-support);

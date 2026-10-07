@@ -19,7 +19,7 @@ export function CreateMnemonicScreen() {
     try {
       await navigator.clipboard.writeText(pendingMnemonic)
       setCopied(true)
-      toast.success('Copied to clipboard — store it somewhere safe')
+      toast.success('Copied to clipboard - store it somewhere safe')
       setTimeout(() => setCopied(false), 3000)
     } catch {
       toast.error('Could not copy. Please write it down manually.')

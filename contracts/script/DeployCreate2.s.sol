@@ -13,14 +13,14 @@ import {Create2Factory} from "./Create2Factory.sol";
 ///   CREATE2_SALT        - bytes32 salt, e.g. `cast keccak "my-app-v1"` or any 0x-prefixed 32-byte value
 ///   CREATION_CODE       - 0x-prefixed creation bytecode of the target contract, ABI-encoded with
 ///                         constructor args already appended (i.e. `type(Target).creationCode`
-///                         concatenated with `abi.encode(ctorArgs...)` — build this off-chain, e.g.
+///                         concatenated with `abi.encode(ctorArgs...)` - build this off-chain, e.g.
 ///                         with `cast abi-encode` + `forge inspect Target bytecode`, or inline it in a
 ///                         thin wrapper script that constructs `abi.encodePacked(type(Target).creationCode, abi.encode(...))`)
 ///   DEPLOY_VALUE        - optional wei amount to forward to the target's constructor (default 0)
 ///
 /// `CREATE2_SALT` is read via `vm.envBytes32` directly. If you'd rather derive the salt from a
 /// human-readable string, read it with `vm.envString("CREATE2_SALT_STRING")` and hash it yourself
-/// (`keccak256(bytes(saltString))`) before use — either approach is fine, this script takes the
+/// (`keccak256(bytes(saltString))`) before use - either approach is fine, this script takes the
 /// direct bytes32 env var because it avoids an extra hashing step for callers that already have
 /// a well-formed salt.
 contract DeployCreate2 is Script {

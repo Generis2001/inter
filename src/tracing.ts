@@ -7,11 +7,11 @@
  * Events are sent to the parent frame via postMessage.
  *
  * Imported as a side-effect before any app code runs.
- * Built with Arc Studio — https://studio.arc.io
+ * Built with Arc Studio - https://studio.arc.io
  */
 
 // ---------------------------------------------------------------------------
-// Types (inlined — sandbox can't use app module aliases)
+// Types (inlined - sandbox can't use app module aliases)
 // ---------------------------------------------------------------------------
 
 interface TraceGroupRef { id: string; label: string; }
@@ -82,7 +82,7 @@ function id(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Group stack — stack-based nesting for trace groups
+// Group stack - stack-based nesting for trace groups
 // ---------------------------------------------------------------------------
 
 interface GroupStackEntry { id: string; label: string; }
@@ -121,7 +121,7 @@ function setupTraceAPI(): void {
       const entry = _groupStack.pop();
       invalidateGroupCache();
       if (!entry) {
-        log('endGroup called with empty stack — ignoring');
+        log('endGroup called with empty stack - ignoring');
         return;
       }
       if (_enabled) {
@@ -135,7 +135,7 @@ function setupTraceAPI(): void {
 setupTraceAPI();
 
 // ---------------------------------------------------------------------------
-// emitWithGroups — attaches current group ancestry to RPC/HTTP events
+// emitWithGroups - attaches current group ancestry to RPC/HTTP events
 // ---------------------------------------------------------------------------
 
 function emitWithGroups(event: RpcTraceEvent | HttpTraceEvent): void {
@@ -210,7 +210,7 @@ function parseChainId(raw: unknown): number {
 }
 
 // ---------------------------------------------------------------------------
-// Opt-in/opt-out — parent frame controls whether tracing is active
+// Opt-in/opt-out - parent frame controls whether tracing is active
 // ---------------------------------------------------------------------------
 
 let _enabled = false;
@@ -340,7 +340,7 @@ function findResp(resps: JRPCRes[], reqId: unknown): JRPCRes | undefined {
 }
 
 // ---------------------------------------------------------------------------
-// Patch globalThis.fetch — captures viem http() transport + regular HTTP
+// Patch globalThis.fetch - captures viem http() transport + regular HTTP
 // ---------------------------------------------------------------------------
 
 try {
@@ -414,7 +414,7 @@ try {
 } catch (e) { log('fetch patch FAILED', e); }
 
 // ---------------------------------------------------------------------------
-// Patch window.ethereum.request() — captures EIP-1193 provider calls
+// Patch window.ethereum.request() - captures EIP-1193 provider calls
 // (e.g. eth_sendTransaction, eth_estimateGas via injected wallets)
 // ---------------------------------------------------------------------------
 

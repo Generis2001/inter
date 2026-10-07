@@ -1,5 +1,5 @@
 /**
- * fetch-abi <address> [--network arc-testnet] — resolve a deployed contract's
+ * fetch-abi <address> [--network arc-testnet] - resolve a deployed contract's
  * ABI from a Blockscout (Arcscan) explorer and write src/contracts/<Name>.json.
  * The full ABI stays in the file; stdout gets a compact summary only, to keep
  * it out of the agent's context. Runs in-sandbox under bun.
@@ -411,7 +411,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  // No verified ABI — distinguish not-found from unverified via the RPC.
+  // No verified ABI - distinguish not-found from unverified via the RPC.
   const code = await fetchCode(net, address, fetch);
 
   if (code === null) {
@@ -422,13 +422,13 @@ async function main(): Promise<void> {
 
   if (!hasContractCode(code)) {
     throw new Error(
-      `No contract found at ${address} on ${net.label}. v0 supports Arc Testnet only — double-check the address and network.`,
+      `No contract found at ${address} on ${net.label}. v0 supports Arc Testnet only - double-check the address and network.`,
     );
   }
 
   console.log(
     [
-      `Status: unverified — ${net.label} has no verified ABI for ${address}.`,
+      `Status: unverified - ${net.label} has no verified ABI for ${address}.`,
       `Explorer: ${net.explorerUrl}/address/${address}`,
       `Action: ask the user to paste the contract's ABI JSON, then write`,
       `  { "address": "${address}", "chainId": ${net.chainId}, "name": "Contract", "abi": [...] }`,

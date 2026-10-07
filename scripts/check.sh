@@ -4,7 +4,7 @@
 # Sequential on purpose: one agent round trip instead of two, and each step
 # still gets the sandbox's full CPU rather than splitting it with the other.
 # Both are now near-instant (oxlint --type-aware + tsc 7 typically finish in
-# well under a second combined on a real app — see CHANGELOG for the
+# well under a second combined on a real app - see CHANGELOG for the
 # eslint/tsc 5.6 comparison), so sequencing costs nothing worth trading away.
 # Both steps always run so one invocation reports lint AND type errors.
 #
@@ -43,7 +43,7 @@ run_step() {
     echo "check: wait for background work to finish, then re-run: bun run check" >&2
     fail=1
   elif [ "${step_exit}" -eq 137 ]; then
-    echo "check: ${step_name} was killed (exit 137) after ${step_elapsed}s — likely out of memory. Stop other heavy processes and re-run: bun run check" >&2
+    echo "check: ${step_name} was killed (exit 137) after ${step_elapsed}s - likely out of memory. Stop other heavy processes and re-run: bun run check" >&2
     fail=1
   elif [ "${step_exit}" -ne 0 ]; then
     fail=1

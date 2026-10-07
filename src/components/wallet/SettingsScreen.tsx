@@ -66,7 +66,7 @@ export function SettingsScreen() {
                 My Wallet
               </p>
               <p className="mono mt-0.5 truncate text-xs" style={{ color: 'var(--subtle)' }}>
-                {address ?? '—'}
+                {address ?? '-'}
               </p>
             </div>
           </div>

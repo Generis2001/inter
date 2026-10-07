@@ -116,7 +116,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
     }
   }, [address, chain.explorerBase])
 
-  // Sync with block explorer API — external system, setState-in-effect is correct here.
+  // Sync with block explorer API - external system, setState-in-effect is correct here.
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
     void fetchTxns()

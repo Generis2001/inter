@@ -14,7 +14,7 @@ export function VerifyMnemonicScreen() {
     [pendingMnemonic],
   )
 
-  // Pick 4 positions to verify — spread evenly across the phrase, deterministic per render
+  // Pick 4 positions to verify - spread evenly across the phrase, deterministic per render
   const testIndices = useMemo(() => {
     if (allWords.length < 4) return []
     const step = Math.floor(allWords.length / 4)

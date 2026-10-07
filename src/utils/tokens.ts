@@ -1,6 +1,6 @@
 /**
  * Arc Mainnet token registry.
- * Import token facts from here — never hard-code addresses or decimals inline.
+ * Import token facts from here - never hard-code addresses or decimals inline.
  */
 
 export interface TokenInfo {

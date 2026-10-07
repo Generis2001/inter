@@ -2,7 +2,7 @@
  * Notification state derived from live transaction history.
  * Tracks new incoming (received) transactions since the user last opened
  * the notification panel, and surfaces them as actionable items.
- * State is kept in memory only — never persisted — so it resets on reload.
+ * State is kept in memory only - never persisted - so it resets on reload.
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { ArcTransaction } from './useArcTransactions'

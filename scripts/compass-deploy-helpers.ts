@@ -104,8 +104,8 @@ function assertNumbersSurviveJsonParse(value: unknown, path: string): void {
   if (typeof value === 'number' && !Number.isSafeInteger(value)) {
     throw new Error(
       `Constructor arg ${path} (${value}) is not an exact integer. JSON numbers above ` +
-        `Number.MAX_SAFE_INTEGER are rounded on parse — 1000000000000000000000000 becomes ` +
-        `999999999999999983222784, and nothing downstream can tell — and Solidity has no fractional types. ` +
+        `Number.MAX_SAFE_INTEGER are rounded on parse - 1000000000000000000000000 becomes ` +
+        `999999999999999983222784, and nothing downstream can tell - and Solidity has no fractional types. ` +
         `Pass large integers as a decimal string instead, e.g. "1000000000000000000000000", which encodes exactly.`,
     );
   }
@@ -210,7 +210,7 @@ export function assertConstructorArgs(
   }
 
   const ownerHint = inputs.some((i) => i.type === 'address' && /owner|admin|authority/i.test(i.name ?? ''))
-    ? ` The address parameter is likely the owner — pass the deployer wallet address, or ${DEPLOYER_PLACEHOLDER} to have it substituted automatically.`
+    ? ` The address parameter is likely the owner - pass the deployer wallet address, or ${DEPLOYER_PLACEHOLDER} to have it substituted automatically.`
     : '';
 
   throw new Error(
@@ -363,7 +363,7 @@ export function assertVerifyReceiptCovers(
   if (receipt.fingerprint.toLowerCase() !== expected.fingerprint.toLowerCase()) {
     throw new Error(
       `Refusing --mode live: ${expected.contractName}'s compiled bytecode or constructor args changed since it was ` +
-        `fork-verified — the fork run no longer describes what you are about to deploy.\n${rerun}`,
+        `fork-verified - the fork run no longer describes what you are about to deploy.\n${rerun}`,
     );
   }
 
@@ -372,8 +372,8 @@ export function assertVerifyReceiptCovers(
   if (!Number.isFinite(verifiedAtMs) || nowMs - verifiedAtMs > VERIFY_RECEIPT_MAX_AGE_MS) {
     throw new Error(
       `Refusing --mode live: ${expected.contractName}'s fork-verify receipt is stale (verifiedAt ` +
-        `${receipt.verifiedAt}). Foundry bytecode is deterministic, so a receipt from an earlier — possibly ` +
-        `abandoned — session would otherwise satisfy this gate forever; it is only accepted for ` +
+        `${receipt.verifiedAt}). Foundry bytecode is deterministic, so a receipt from an earlier - possibly ` +
+        `abandoned - session would otherwise satisfy this gate forever; it is only accepted for ` +
         `${VERIFY_RECEIPT_MAX_AGE_MS / 60_000} minutes.\n${rerun}`,
     );
   }
@@ -383,7 +383,7 @@ export function getForkRpcUrl(run: Record<string, unknown>, chain: string): stri
   const forks = run.forks;
 
   if (!(forks instanceof Map)) {
-    throw new Error('Dry-run result has no forks map — cannot locate the fork RPC URL.');
+    throw new Error('Dry-run result has no forks map - cannot locate the fork RPC URL.');
   }
 
   const fork = forks.get(chain) as { rpcUrl?: unknown } | undefined;

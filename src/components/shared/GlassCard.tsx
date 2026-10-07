@@ -43,5 +43,5 @@ export function GlassCard({ children, className, variant = 'card', style, onClic
   )
 }
 
-/** Accent gradient — cyan-500 → sky-500 */
+/** Accent gradient - cyan-500 → sky-500 */
 export const spectral = 'linear-gradient(90deg, #06b6d4, #0ea5e9, #818cf8, #a78bfa)'

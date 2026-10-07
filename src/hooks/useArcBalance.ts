@@ -1,6 +1,6 @@
 /**
  * Read USDC balance from Arc Mainnet ERC-20 (6 decimals).
- * On Arc, native and USDC ERC-20 are ONE pool — we show ONLY the ERC-20 view.
+ * On Arc, native and USDC ERC-20 are ONE pool - we show ONLY the ERC-20 view.
  */
 import { useReadContract, useBlockNumber } from 'wagmi'
 import { erc20Abi } from 'viem'

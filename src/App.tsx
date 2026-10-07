@@ -68,7 +68,7 @@ function WalletApp() {
 
   return (
     <div className="relative min-h-dvh">
-      {/* Global top bar — logo left, bell + avatar right */}
+      {/* Global top bar - logo left, bell + avatar right */}
       <header
         className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between px-4 py-3"
         style={{
@@ -108,7 +108,7 @@ function WalletApp() {
             )}
           </button>
 
-          {/* Wallet avatar — cyan gradient */}
+          {/* Wallet avatar - cyan gradient */}
           <div
             className="flex size-8 items-center justify-center rounded-2xl text-xs font-bold text-white"
             style={{ background: 'var(--accent-gradient)' }}
@@ -128,7 +128,7 @@ function WalletApp() {
         onClearAll={clearAll}
       />
 
-      {/* Page content — offset for fixed header */}
+      {/* Page content - offset for fixed header */}
       <div className="pt-14">
         <AnimatePresence mode="wait">
           {activeTab === 'home' && (
