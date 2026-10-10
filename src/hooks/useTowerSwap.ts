@@ -23,6 +23,7 @@ import { Amount } from '@/onchain-money'
 
 const TOWER_BASE = 'https://www.tower.exchange/api/public'
 const SLIPPAGE_BPS = 50   // 0.5%
+const ARC_CHAIN_ID = 5042
 
 // ---- types ------------------------------------------------------------------
 
@@ -95,6 +96,7 @@ async function towerQuote(
       outputToken: tokenOut.address,
       inputAmount: amountIn.toString(),
       slippageTolerance: SLIPPAGE_BPS,
+      chainId: ARC_CHAIN_ID,
     }),
   })
   const json = (await res.json()) as TowerQuoteResponse

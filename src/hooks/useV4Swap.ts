@@ -17,7 +17,6 @@ import {
   parseAbi,
   encodePacked,
   encodeAbiParameters,
-  parseAbiParameters,
   maxUint256,
   toHex,
   type Address,
@@ -47,6 +46,10 @@ const PERMIT2_ABI = parseAbi([
 
 const UNIVERSAL_ROUTER_ABI = parseAbi([
   'function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable',
+  // Custom errors — needed so viem can decode reverts
+  'error SliceOutOfBounds()',
+  'error InvalidCommandType(uint256 commandType)',
+  'error ExecutionFailed(uint256 commandIndex, bytes message)',
 ])
 
 // V4 Universal Router command byte (V4_SWAP = 0x10)
@@ -120,28 +123,48 @@ function encodeV4SwapInput(p: {
     [ACTION_SWAP_EXACT_IN_SINGLE, ACTION_SETTLE_ALL, ACTION_TAKE_ALL],
   )
 
-  // params[0]: ExactInputSingleParams
-  // struct: poolKey{currency0,currency1,fee,tickSpacing,hooks}, zeroForOne, amountIn, amountOutMinimum, hookData
+  // params[0]: ExactInputSingleParams — must be encoded as a SINGLE outer tuple
+  // because the V4Router decodes via abi.decode(data, (ExactInputSingleParams)).
+  // ExactInputSingleParams has `bytes hookData` (dynamic), so that decode expects
+  // a 32-byte offset pointer at the start of `data`. Using encodeAbiParameters with
+  // a wrapping { type: 'tuple', components: [...] } causes viem to emit that offset.
   const swapParams = encodeAbiParameters(
-    parseAbiParameters(
-      '(address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) poolKey,' +
-      ' bool zeroForOne,' +
-      ' uint128 amountIn,' +
-      ' uint128 amountOutMinimum,' +
-      ' bytes hookData',
-    ),
     [
       {
-        currency0,
-        currency1,
-        fee: POOL_FEE,
-        tickSpacing: TICK_SPACING,
-        hooks: '0x0000000000000000000000000000000000000000' as Address,
+        type: 'tuple',
+        components: [
+          {
+            name: 'poolKey',
+            type: 'tuple',
+            components: [
+              { name: 'currency0',  type: 'address' },
+              { name: 'currency1',  type: 'address' },
+              { name: 'fee',        type: 'uint24'  },
+              { name: 'tickSpacing',type: 'int24'   },
+              { name: 'hooks',      type: 'address' },
+            ],
+          },
+          { name: 'zeroForOne',        type: 'bool'    },
+          { name: 'amountIn',          type: 'uint128' },
+          { name: 'amountOutMinimum',  type: 'uint128' },
+          { name: 'hookData',          type: 'bytes'   },
+        ],
       },
-      zeroForOne,
-      amountIn,
-      minAmountOut,
-      '0x',
+    ],
+    [
+      [
+        {
+          currency0,
+          currency1,
+          fee: POOL_FEE,
+          tickSpacing: TICK_SPACING,
+          hooks: '0x0000000000000000000000000000000000000000' as Address,
+        },
+        zeroForOne,
+        amountIn,
+        minAmountOut,
+        '0x',
+      ],
     ],
   )
 
