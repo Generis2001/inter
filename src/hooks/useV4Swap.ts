@@ -17,6 +17,7 @@ import {
   parseAbi,
   encodePacked,
   encodeAbiParameters,
+  parseAbiParameters,
   maxUint256,
   toHex,
   type Address,

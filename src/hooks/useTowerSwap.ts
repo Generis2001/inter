@@ -92,15 +92,21 @@ async function towerQuote(
       ...(key ? { Authorization: `Bearer ${key}` } : {}),
     },
     body: JSON.stringify({
-      inputToken: tokenIn.address,
-      outputToken: tokenOut.address,
-      inputAmount: amountIn.toString(),
+      inputToken:       tokenIn.symbol,   // Tower uses symbols (USDC/EURC), not hex addresses
+      outputToken:      tokenOut.symbol,
+      inputAmount:      amountIn.toString(),
       slippageTolerance: SLIPPAGE_BPS,
-      chainId: ARC_CHAIN_ID,
+      chainId:          ARC_CHAIN_ID,
     }),
   })
   const json = (await res.json()) as TowerQuoteResponse
-  if (!json.success || !json.data) throw new Error('Quote failed')
+  if (!json.success || !json.data) {
+    // Surface the real API error so it can be shown / debugged
+    const detail = (json as { error?: string; message?: string }).error
+      ?? (json as { error?: string; message?: string }).message
+      ?? `HTTP ${res.status}`
+    throw new Error(`Quote failed: ${detail}`)
+  }
   return json.data
 }
 
