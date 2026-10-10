@@ -257,7 +257,7 @@ export function SettingsScreen() {
             {[
               { label: 'App', value: 'inter' },
               { label: 'Version', value: '1.0.0' },
-              { label: 'Built on', value: 'Arc Studio' },
+              { label: 'Network', value: 'Arc' },
             ].map(({ label, value }, i) => (
               <div
                 key={label}
