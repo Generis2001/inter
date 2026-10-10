@@ -8,6 +8,8 @@ import { DashboardScreen } from './components/wallet/DashboardScreen'
 import { ActivityScreen } from './components/wallet/ActivityScreen'
 import { AssetsScreen } from './components/wallet/AssetsScreen'
 import { SettingsScreen } from './components/wallet/SettingsScreen'
+import { AnsScreen } from './components/wallet/AnsScreen'
+import { SwapScreen } from './components/wallet/SwapScreen'
 import { SendSheet } from './components/wallet/SendSheet'
 import { ReceiveSheet } from './components/wallet/ReceiveSheet'
 import { NotificationPanel } from './components/wallet/NotificationPanel'
@@ -15,6 +17,7 @@ import { BottomNav, type NavTab } from './components/wallet/BottomNav'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useArcTransactions } from './hooks/useArcTransactions'
 import { useNotifications } from './hooks/useNotifications'
+import { useArcNSPrimaryName } from './hooks/useArcNSPrimaryName'
 import { InterLogo } from './components/shared/InterLogo'
 import { Bell } from 'lucide-react'
 
@@ -30,6 +33,8 @@ function WalletApp() {
   // Live transactions (fetched at app level so notifications work on every tab)
   const { transactions } = useArcTransactions(address)
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications(transactions)
+  // Resolve the user's primary ANS name for the header avatar tooltip
+  const { primaryName } = useArcNSPrimaryName(address)
 
   const isUnlocked = screen === 'unlocked'
 
@@ -37,6 +42,7 @@ function WalletApp() {
     if (target === 'activity') setActiveTab('activity')
     if (target === 'assets') setActiveTab('assets')
     if (target === 'settings') setActiveTab('settings')
+    if (target === 'ans') setActiveTab('ans')
   }
 
   if (!isUnlocked) {
@@ -68,7 +74,7 @@ function WalletApp() {
 
   return (
     <div className="relative min-h-dvh">
-      {/* Global top bar - logo left, bell + avatar right */}
+      {/* Global top bar — logo left, bell + avatar right */}
       <header
         className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between px-4 py-3"
         style={{
@@ -108,13 +114,18 @@ function WalletApp() {
             )}
           </button>
 
-          {/* Wallet avatar - cyan gradient */}
-          <div
-            className="flex size-8 items-center justify-center rounded-2xl text-xs font-bold text-white"
+          {/* Wallet avatar — shows ANS name if set, else address initials */}
+          <button
+            onClick={() => setActiveTab('settings')}
+            className="flex h-8 min-w-[32px] items-center justify-center rounded-2xl px-2 text-xs font-bold text-white transition-all hover:scale-[1.03]"
             style={{ background: 'var(--accent-gradient)' }}
+            title={primaryName ?? address ?? ''}
           >
-            {address ? address.slice(2, 4).toUpperCase() : 'IW'}
-          </div>
+            {primaryName
+              ? primaryName.replace(/\.(arc|circle)$/, '').slice(0, 8)
+              : address ? address.slice(2, 4).toUpperCase() : 'IW'
+            }
+          </button>
         </div>
       </header>
 
@@ -128,7 +139,7 @@ function WalletApp() {
         onClearAll={clearAll}
       />
 
-      {/* Page content - offset for fixed header */}
+      {/* Page content — offset for fixed header */}
       <div className="pt-14">
         <AnimatePresence mode="wait">
           {activeTab === 'home' && (
@@ -167,6 +178,28 @@ function WalletApp() {
               transition={{ duration: 0.15 }}
             >
               <AssetsScreen />
+            </motion.div>
+          )}
+          {activeTab === 'swap' && (
+            <motion.div
+              key="swap"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <SwapScreen />
+            </motion.div>
+          )}
+          {activeTab === 'ans' && (
+            <motion.div
+              key="ans"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <AnsScreen />
             </motion.div>
           )}
           {activeTab === 'settings' && (

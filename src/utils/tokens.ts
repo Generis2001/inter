@@ -1,6 +1,6 @@
 /**
  * Arc Mainnet token registry.
- * Import token facts from here - never hard-code addresses or decimals inline.
+ * Import token facts from here — never hard-code addresses or decimals inline.
  */
 
 export interface TokenInfo {
@@ -28,7 +28,7 @@ export const TOKENS: TokenInfo[] = [
   {
     symbol: 'EURC',
     name: 'Euro Coin',
-    address: '0xbEf5f6d51CB62b58e6a8f77868681825c6fe21c1',
+    address: '0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1',
     decimals: 6,
     sign: '€',
     currency: 'EUR',

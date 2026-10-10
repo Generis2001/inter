@@ -66,7 +66,7 @@ export function SettingsScreen() {
                 My Wallet
               </p>
               <p className="mono mt-0.5 truncate text-xs" style={{ color: 'var(--subtle)' }}>
-                {address ?? '-'}
+                {address ?? 'Not connected'}
               </p>
             </div>
           </div>
@@ -257,7 +257,7 @@ export function SettingsScreen() {
             {[
               { label: 'App', value: 'inter' },
               { label: 'Version', value: '1.0.0' },
-              { label: 'Network', value: 'Arc' },
+              { label: 'Built by', value: 'Generis2001' },
             ].map(({ label, value }, i) => (
               <div
                 key={label}

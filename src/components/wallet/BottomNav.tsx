@@ -1,7 +1,7 @@
-import { Home, Activity, Layers, Settings } from 'lucide-react'
+import { Home, Activity, Settings, AtSign, ArrowLeftRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export type NavTab = 'home' | 'activity' | 'assets' | 'settings'
+export type NavTab = 'home' | 'activity' | 'assets' | 'swap' | 'ans' | 'settings'
 
 interface BottomNavProps {
   active: NavTab
@@ -9,10 +9,11 @@ interface BottomNavProps {
 }
 
 const TABS: { key: NavTab; icon: typeof Home; label: string }[] = [
-  { key: 'home',     icon: Home,     label: 'Home'     },
-  { key: 'activity', icon: Activity, label: 'Activity' },
-  { key: 'assets',   icon: Layers,   label: 'Assets'   },
-  { key: 'settings', icon: Settings, label: 'Settings' },
+  { key: 'home',     icon: Home,             label: 'Home'     },
+  { key: 'activity', icon: Activity,         label: 'Activity' },
+  { key: 'swap',     icon: ArrowLeftRight,   label: 'Swap'     },
+  { key: 'ans',      icon: AtSign,           label: 'Names'    },
+  { key: 'settings', icon: Settings,         label: 'Settings' },
 ]
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
@@ -37,7 +38,7 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
             <button
               key={key}
               onClick={() => onChange(key)}
-              className="relative flex min-w-[60px] flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-all"
+              className="relative flex min-w-[52px] flex-col items-center gap-1 rounded-2xl px-2 py-2 transition-all"
             >
               {isActive && (
                 <motion.div

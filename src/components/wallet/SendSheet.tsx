@@ -7,12 +7,14 @@ import { useState, useMemo } from 'react'
 import { useWallet } from '../../context/WalletContext'
 import { useTokenBalance } from '../../hooks/useTokenBalance'
 import { useTokenGasEstimate } from '../../hooks/useTokenGasEstimate'
+import { useArcNSResolution } from '../../hooks/useArcNSResolution'
 import { BottomSheet } from '../shared/BottomSheet'
 import { TokenIcon } from '../shared/TokenLogo'
 import { isValidAddress, parseOnchainError } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
 import { TOKENS, type TokenInfo } from '../../utils/tokens'
+
 import { createWalletClient, createPublicClient, http, erc20Abi } from 'viem'
 import { arc } from 'viem/chains'
 import {
@@ -21,6 +23,7 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
+  AtSign,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -117,6 +120,15 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
   const [txHash, setTxHash] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
+  // ArcNS resolution — fires when recipient looks like a .arc / .circle name
+  const { state: ansState, isName: recipientIsName, resolveNow } = useArcNSResolution(recipient)
+
+  // The effective address to send to: resolved ANS address OR raw address input
+  const effectiveAddress: string =
+    recipientIsName && ansState.status === 'resolved'
+      ? ansState.address
+      : recipient
+
   // Reset amount when token changes
   const handleTokenChange = (t: TokenInfo) => {
     setSelectedToken(t)
@@ -133,16 +145,27 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
     }
   }, [amountStr, selectedToken.decimals])
 
-  // Gas estimate
+  // Gas estimate — use effective address
   const { feeFormatted, feeAmount } = useTokenGasEstimate(
     selectedToken,
     address,
-    isValidAddress(recipient) ? (recipient as `0x${string}`) : undefined,
+    isValidAddress(effectiveAddress) ? (effectiveAddress as `0x${string}`) : undefined,
     parsedAmount?.raw,
   )
 
   // Validation
-  const recipientError = recipient.length > 0 && !isValidAddress(recipient) ? 'Invalid address' : ''
+  const recipientResolving = recipientIsName && ansState.status === 'resolving'
+  const recipientError = useMemo(() => {
+    if (recipient.length === 0) return ''
+    if (recipientIsName) {
+      if (ansState.status === 'resolving') return ''
+      if (ansState.status === 'not_found') return `${recipient} has no address record`
+      if (ansState.status === 'error') return ansState.hint
+      return ''
+    }
+    if (!isValidAddress(recipient)) return 'Invalid address'
+    return ''
+  }, [recipient, recipientIsName, ansState])
   const amountError = useMemo(() => {
     if (!parsedAmount) return amountStr.length > 0 ? 'Enter a valid amount' : ''
     if (parsedAmount.isZero()) return 'Amount must be greater than 0'
@@ -151,10 +174,12 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
   }, [parsedAmount, balanceAmount, amountStr])
 
   const isValid =
-    isValidAddress(recipient) &&
+    isValidAddress(effectiveAddress) &&
+    !recipientResolving &&
     parsedAmount &&
     parsedAmount.isPositive() &&
     !amountError &&
+    !recipientError &&
     account !== null
 
   const handleMax = () => {
@@ -169,10 +194,25 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
   }
 
   const handleSend = async () => {
-    if (!account || !parsedAmount || !isValidAddress(recipient)) return
+    if (!account || !parsedAmount) return
     setStep('submitting')
     setErrorMsg('')
     try {
+      // Re-resolve ANS name immediately before constructing the transaction
+      let finalAddress: `0x${string}`
+      if (recipientIsName) {
+        const resolved = await resolveNow()
+        if (!resolved) {
+          setErrorMsg(`Could not resolve ${recipient} — try again or use a direct address.`)
+          setStep('error')
+          return
+        }
+        finalAddress = resolved
+      } else {
+        if (!isValidAddress(recipient)) return
+        finalAddress = recipient as `0x${string}`
+      }
+
       // HDAccount and PrivateKeyAccount both satisfy viem's Account interface
       type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A } ? NonNullable<A> : never
       const viemAcct = account as unknown as ViemAccount
@@ -184,7 +224,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
         address: selectedToken.address,
         abi: erc20Abi,
         functionName: 'transfer',
-        args: [recipient as `0x${string}`, parsedAmount.raw],
+        args: [finalAddress, parsedAmount.raw],
       })
 
       setTxHash(hash)
@@ -217,20 +257,55 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             {/* Recipient */}
             <div className="mb-4">
               <label className="mb-1.5 block text-xs font-semibold" style={{ color: 'var(--ink-2)' }}>
-                Recipient Address
+                Recipient
               </label>
-              <input
-                className="mono w-full rounded-2xl px-4 py-3 text-sm outline-none placeholder:text-slate-300"
-                style={{
-                  background: 'rgba(255,255,255,0.60)',
-                  border: recipientError ? '1px solid rgba(186,43,76,0.40)' : '1px solid rgba(18,45,69,0.12)',
-                  color: 'var(--ink)',
-                }}
-                placeholder="0x..."
-                value={recipient}
-                onChange={(e) => setRecipient(e.target.value.trim())}
-                spellCheck={false}
-              />
+              <div className="relative">
+                {recipientIsName && (
+                  <AtSign
+                    className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2"
+                    style={{ color: 'var(--accent)' }}
+                  />
+                )}
+                <input
+                  className="w-full rounded-2xl py-3 text-sm outline-none placeholder:text-slate-300"
+                  style={{
+                    background: 'rgba(255,255,255,0.60)',
+                    border: recipientError
+                      ? '1px solid rgba(186,43,76,0.40)'
+                      : ansState.status === 'resolved'
+                        ? '1px solid rgba(5,150,105,0.30)'
+                        : '1px solid rgba(18,45,69,0.12)',
+                    color: 'var(--ink)',
+                    paddingLeft: recipientIsName ? '2.25rem' : '1rem',
+                    fontFamily: recipientIsName ? 'inherit' : 'monospace',
+                  }}
+                  placeholder="0x... or yourname.arc"
+                  value={recipient}
+                  onChange={(e) => setRecipient(e.target.value.trim())}
+                  spellCheck={false}
+                />
+              </div>
+
+              {/* ANS resolution status */}
+              {recipientIsName && (
+                <div className="mt-1.5">
+                  {ansState.status === 'resolving' && (
+                    <div className="flex items-center gap-1.5">
+                      <Loader2 className="size-3 animate-spin" style={{ color: 'var(--accent)' }} />
+                      <span className="text-xs" style={{ color: 'var(--muted)' }}>Resolving name...</span>
+                    </div>
+                  )}
+                  {ansState.status === 'resolved' && (
+                    <div className="flex items-center gap-1.5">
+                      <Check className="size-3" style={{ color: 'var(--success)' }} />
+                      <span className="mono text-xs" style={{ color: 'var(--success)' }}>
+                        {ansState.address.slice(0, 10)}...{ansState.address.slice(-6)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {recipientError && (
                 <p className="mt-1 text-xs" style={{ color: 'var(--danger)' }}>
                   {recipientError}
@@ -334,7 +409,13 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             <div className="mb-5 overflow-hidden rounded-2xl" style={{ border: '1px solid var(--border)' }}>
               {[
                 { label: 'Sending', value: `${parsedAmount.toFixed(2)} ${selectedToken.symbol}` },
-                { label: 'To', value: `${recipient.slice(0, 10)}...${recipient.slice(-6)}`, mono: true },
+                {
+                  label: 'To',
+                  value: recipientIsName
+                    ? `${recipient} (${effectiveAddress.slice(0, 8)}...${effectiveAddress.slice(-4)})`
+                    : `${effectiveAddress.slice(0, 10)}...${effectiveAddress.slice(-6)}`,
+                  mono: true,
+                },
                 { label: 'Network fee', value: `${feeFormatted} USDC` },
               ].map(({ label, value, mono }, i) => (
                 <div
