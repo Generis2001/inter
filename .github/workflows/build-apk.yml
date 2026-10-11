@@ -41,13 +41,9 @@ jobs:
       - name: Build Debug APK with Gradle
         run: |
           cd android
-          if [ ! -f "gradlew" ]; then
-            gradle wrapper || gradle assembleDebug --no-daemon
-          fi
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug --no-daemon
-          fi
+          gradle wrapper --gradle-version 8.2.1
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
 
       - name: Locate APK
         run: |
