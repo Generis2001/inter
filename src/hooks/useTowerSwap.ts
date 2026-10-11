@@ -14,6 +14,8 @@ import {
   createPublicClient,
   createWalletClient,
   http,
+  parseAbi,
+  maxUint256,
   type Address,
 } from 'viem'
 import { arc } from 'viem/chains'
@@ -24,6 +26,11 @@ import { Amount } from '@/onchain-money'
 const TOWER_BASE = 'https://www.tower.exchange/api/public'
 const SLIPPAGE_BPS = 50   // 0.5%
 const ARC_CHAIN_ID = 5042
+
+const ERC20_ABI = parseAbi([
+  'function allowance(address owner, address spender) view returns (uint256)',
+  'function approve(address spender, uint256 amount) returns (bool)',
+])
 
 // ---- types ------------------------------------------------------------------
 
@@ -43,11 +50,15 @@ interface TowerQuoteResponse {
     outputToken: string
     inputAmount: string
     outputAmount: string
+    outputAmountRaw?: string
+    outputAmountNative?: string
+    amountScale?: string
     priceImpact: number
     dexName: string
-    dexId: string
-    route: unknown[]
-    slippageTolerance: number
+    dexId?: string
+    route?: unknown
+    slippageTolerance?: number
+    [key: string]: unknown
   }
 }
 
@@ -55,16 +66,20 @@ interface TowerBuildTxResponse {
   success: boolean
   data: {
     approve?: {
-      to: string
+      to?: string
+      token?: string
+      spender?: string
       data: string
-      value: string
-      gasLimit: string
+      value?: string
+      gasLimit?: string
+      amountRaw?: string
     }
     swap: {
       to: string
       data: string
       value: string
-      gasLimit: string
+      gasLimit?: string
+      executorAddress?: string
     }
   }
 }
@@ -77,6 +92,23 @@ function getApiKey(): string {
 
 function getPublicClient() {
   return createPublicClient({ chain: arc, transport: http() })
+}
+
+function parseQuoteOutputAmount(data: TowerQuoteResponse['data'], decimals: number): Amount {
+  // Tower returns outputAmountRaw / outputAmountNative in base token decimals (e.g. "8920" for 0.008920 EURC).
+  // The outputAmount field is scaled to 1e18 (normalized_1e18, e.g. "8920000000000000").
+  if (data.outputAmountRaw) {
+    return Amount.fromRaw(BigInt(data.outputAmountRaw), decimals)
+  }
+  if (data.outputAmountNative) {
+    return Amount.fromRaw(BigInt(data.outputAmountNative), decimals)
+  }
+  const raw = BigInt(data.outputAmount)
+  if (data.amountScale === 'normalized_1e18' && decimals < 18) {
+    const scaleDiff = 18n - BigInt(decimals)
+    return Amount.fromRaw(raw / 10n ** scaleDiff, decimals)
+  }
+  return Amount.fromRaw(raw, decimals)
 }
 
 async function towerQuote(
@@ -166,7 +198,7 @@ export function useTowerSwap() {
         .then((quote) => {
           setSwapState({
             status: 'quoted',
-            amountOut: Amount.fromRaw(BigInt(quote.outputAmount), tokenOut.decimals),
+            amountOut: parseQuoteOutputAmount(quote, tokenOut.decimals),
             priceImpact: quote.priceImpact,
             dexName: quote.dexName,
             quoteData: quote,
@@ -198,14 +230,36 @@ export function useTowerSwap() {
       // Build tx calldata from Tower
       const txData = await towerBuildTx(quoteData, account.address)
 
-      // Step 1: ERC-20 approve if Tower returned one
-      if (txData.approve) {
-        const approveTx = await walletClient.sendTransaction({
-          account: viemAcct,
-          to: txData.approve.to as Address,
-          data: txData.approve.data as `0x${string}`,
-          value: BigInt(txData.approve.value ?? '0'),
-        })
+      // Step 1: Ensure ERC-20 approval for Tower swap executor
+      // Note: Tower's approve object provides `token` (the ERC20 contract address) and `spender` (the router/executor)
+      const tokenAddress = ((txData.approve?.token ?? txData.approve?.to ?? tokenIn.address) as Address)
+      const spender = ((txData.approve?.spender ?? txData.swap.executorAddress ?? txData.swap.to) as Address)
+
+      const parsedIn = parseAmountSafe(amountIn, tokenIn.decimals) ?? 0n
+      const currentAllowance = await publicClient.readContract({
+        address: tokenAddress,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [account.address, spender],
+      })
+
+      if (currentAllowance < parsedIn) {
+        setSwapState({ status: 'approving' })
+        const approveData = txData.approve?.data as `0x${string}` | undefined
+        const approveTx = approveData
+          ? await walletClient.sendTransaction({
+              account: viemAcct,
+              to: tokenAddress,
+              data: approveData,
+              value: BigInt(txData.approve?.value ?? '0'),
+            })
+          : await walletClient.writeContract({
+              account: viemAcct,
+              address: tokenAddress,
+              abi: ERC20_ABI,
+              functionName: 'approve',
+              args: [spender, maxUint256],
+            })
         await publicClient.waitForTransactionReceipt({ hash: approveTx })
       }
 
@@ -227,7 +281,7 @@ export function useTowerSwap() {
       const clean = msg.replace(/^.*?(ContractFunctionExecutionError|Error):\s*/i, '').slice(0, 200)
       setSwapState({ status: 'error', message: clean || 'Swap failed. Please try again.' })
     }
-  }, [account, swapState])
+  }, [account, swapState, amountIn, tokenIn])
 
   const reset = useCallback(() => {
     setAmountIn('')
