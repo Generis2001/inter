@@ -162,18 +162,40 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 interface ActivityScreenProps {
   transactions: ArcTransaction[]
+  isLoading?: boolean
+  isError?: boolean
 }
 
-export function ActivityScreen({ transactions }: ActivityScreenProps) {
+export function ActivityScreen({ transactions, isLoading = false, isError = false }: ActivityScreenProps) {
   const [filter, setFilter] = useState<Filter>('all')
-  const isLoading = false
-  const isError = false
+
+  const isSwapTx = (tx: ArcTransaction) =>
+    tx.txType === 'swap' ||
+    Boolean(tx.method?.toLowerCase().includes('swap')) ||
+    Boolean(tx.contractName?.toLowerCase().includes('tower')) ||
+    Boolean(tx.contractName?.toLowerCase().includes('uniswap')) ||
+    Boolean(tx.contractName?.toLowerCase().includes('router'))
+
+  const isSentTx = (tx: ArcTransaction) =>
+    !isSwapTx(tx) && (tx.direction === 'sent' || tx.txType === 'transfer')
+
+  const isReceivedTx = (tx: ArcTransaction) =>
+    tx.direction === 'received'
+
+  const counts: Record<Filter, number> = {
+    all: transactions.length,
+    sent: transactions.filter(isSentTx).length,
+    received: transactions.filter(isReceivedTx).length,
+    swaps: transactions.filter(isSwapTx).length,
+    pending: transactions.filter((t) => t.status === 'pending').length,
+    failed: transactions.filter((t) => t.status === 'failed').length,
+  }
 
   const filtered = transactions.filter((tx) => {
     if (filter === 'all') return true
-    if (filter === 'sent') return tx.direction === 'sent'
-    if (filter === 'received') return tx.direction === 'received'
-    if (filter === 'swaps') return tx.txType === 'swap'
+    if (filter === 'sent') return isSentTx(tx)
+    if (filter === 'received') return isReceivedTx(tx)
+    if (filter === 'swaps') return isSwapTx(tx)
     if (filter === 'pending') return tx.status === 'pending'
     if (filter === 'failed') return tx.status === 'failed'
     return true
@@ -188,34 +210,45 @@ export function ActivityScreen({ transactions }: ActivityScreenProps) {
             Activity
           </h1>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--subtle)' }}>
-            Full transaction history, refreshed every 30s
+            Full transaction history categorized by activity type
           </p>
         </div>
 
         {/* Filter tabs */}
         <div
-          className="mb-4 flex gap-1.5 overflow-x-auto rounded-2xl p-1"
+          className="mb-4 flex gap-1.5 overflow-x-auto rounded-2xl p-1 no-scrollbar"
           style={{ background: 'rgba(18,45,69,0.06)' }}
         >
           {FILTERS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
-              className="shrink-0 rounded-xl px-3 py-2 text-xs font-semibold transition-all"
+              className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all"
               style={{
                 background: filter === key ? 'white' : 'transparent',
                 color: filter === key ? 'var(--ink)' : 'var(--subtle)',
                 boxShadow: filter === key ? '0 2px 8px rgba(18,45,69,0.08)' : 'none',
               }}
             >
-              {label}
+              <span>{label}</span>
+              {counts[key] > 0 && (
+                <span
+                  className="rounded-full px-1.5 py-0.2 text-[10px] font-bold"
+                  style={{
+                    background: filter === key ? 'rgba(6,182,212,0.14)' : 'rgba(18,45,69,0.06)',
+                    color: filter === key ? 'var(--accent)' : 'var(--muted)',
+                  }}
+                >
+                  {counts[key]}
+                </span>
+              )}
             </button>
           ))}
         </div>
 
         {/* Transactions */}
         <GlassCard className="overflow-hidden">
-          {isLoading ? (
+          {isLoading && transactions.length === 0 ? (
             <div className="space-y-1 p-2">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="flex items-start gap-3 px-4 py-3.5">
@@ -227,19 +260,28 @@ export function ActivityScreen({ transactions }: ActivityScreenProps) {
                 </div>
               ))}
             </div>
-          ) : isError ? (
+          ) : isError && transactions.length === 0 ? (
             <div className="px-4 py-10 text-center">
               <p className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>
                 Could not load transactions
               </p>
               <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                Check your connection and try again
+                Check your network connection and try again
               </p>
             </div>
           ) : filtered.length === 0 ? (
             <div className="px-4 py-10 text-center">
-              <p className="text-sm" style={{ color: 'var(--subtle)' }}>
-                No {filter === 'all' ? '' : filter} transactions yet
+              <p className="text-sm font-medium" style={{ color: 'var(--subtle)' }}>
+                No {filter === 'all' ? '' : filter} transactions found
+              </p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--subtle)' }}>
+                {filter === 'swaps'
+                  ? 'Execute a swap via Tower Exchange to see records here'
+                  : filter === 'sent'
+                  ? 'Send tokens to another wallet to see records here'
+                  : filter === 'received'
+                  ? 'Receive tokens to see records here'
+                  : 'Activity on Arc Mainnet will appear here'}
               </p>
             </div>
           ) : (

@@ -32,7 +32,7 @@ function WalletApp() {
   const [notifOpen, setNotifOpen] = useState(false)
 
   // Live transactions (fetched at app level so notifications work on every tab)
-  const { transactions } = useArcTransactions(address)
+  const { transactions, isLoading: txLoading, isError: txError } = useArcTransactions(address)
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications(transactions)
   // Resolve the user's primary ANS name for the header avatar tooltip
   const { primaryName } = useArcNSPrimaryName(address)
@@ -161,6 +161,7 @@ function WalletApp() {
                 onShowSend={() => setSendOpen(true)}
                 onShowReceive={() => setReceiveOpen(true)}
                 transactions={transactions}
+                isLoading={txLoading}
               />
             </motion.div>
           )}
@@ -172,7 +173,11 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <ActivityScreen transactions={transactions} />
+              <ActivityScreen
+                transactions={transactions}
+                isLoading={txLoading}
+                isError={txError}
+              />
             </motion.div>
           )}
           {activeTab === 'assets' && (

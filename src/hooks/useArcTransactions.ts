@@ -62,10 +62,20 @@ const KNOWN_CONTRACTS: Record<string, { name: string; type: 'swap' | 'approval' 
 
 export function recordTransaction(tx: ArcTransaction) {
   try {
-    const key = `inter_tx_history_${tx.from.toLowerCase()}`
-    const existing: ArcTransaction[] = JSON.parse(localStorage.getItem(key) || '[]')
-    const updated = [tx, ...existing.filter((item) => item.hash.toLowerCase() !== tx.hash.toLowerCase())].slice(0, 50)
-    localStorage.setItem(key, JSON.stringify(updated))
+    const fromKey = tx.from ? `inter_tx_history_${tx.from.toLowerCase()}` : null
+    const toKey = tx.to ? `inter_tx_history_${tx.to.toLowerCase()}` : null
+    const globalKey = 'inter_tx_history_all'
+
+    const saveToKey = (key: string) => {
+      const existing: ArcTransaction[] = JSON.parse(localStorage.getItem(key) || '[]')
+      const updated = [tx, ...existing.filter((item) => item.hash.toLowerCase() !== tx.hash.toLowerCase())].slice(0, 50)
+      localStorage.setItem(key, JSON.stringify(updated))
+    }
+
+    if (fromKey) saveToKey(fromKey)
+    if (toKey && toKey !== fromKey) saveToKey(toKey)
+    saveToKey(globalKey)
+
     window.dispatchEvent(new CustomEvent('inter_tx_recorded', { detail: tx }))
   } catch {
     // local storage unavailable
@@ -73,11 +83,63 @@ export function recordTransaction(tx: ArcTransaction) {
 }
 
 export function getRecordedTransactions(address: string | undefined): ArcTransaction[] {
-  if (!address) return []
   try {
-    const key = `inter_tx_history_${address.toLowerCase()}`
-    const stored = localStorage.getItem(key)
-    return stored ? JSON.parse(stored) : []
+    const txMap = new Map<string, ArcTransaction>()
+    const addr = address?.toLowerCase()
+
+    // Collect keys to check
+    const keysToCheck: string[] = ['inter_tx_history_all']
+    if (addr) {
+      keysToCheck.push(`inter_tx_history_${addr}`)
+    }
+    // Also scan all localStorage keys to never miss any recorded tx
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i)
+      if (k && (k.startsWith('inter_tx_history') || k.startsWith('inter_transactions'))) {
+        if (!keysToCheck.includes(k)) keysToCheck.push(k)
+      }
+    }
+
+    for (const key of keysToCheck) {
+      const stored = localStorage.getItem(key)
+      if (stored) {
+        try {
+          const list: ArcTransaction[] = JSON.parse(stored)
+          if (Array.isArray(list)) {
+            for (const item of list) {
+              if (item && item.hash) {
+                // If address is specified, check if it matches from or to, or if from global store
+                if (!addr || item.from?.toLowerCase() === addr || item.to?.toLowerCase() === addr || key === `inter_tx_history_${addr}`) {
+                  const hashKey = item.hash.toLowerCase()
+                  if (!txMap.has(hashKey) || item.status === 'success') {
+                    txMap.set(hashKey, item)
+                  }
+                }
+              }
+            }
+          }
+        } catch {
+          // ignore corrupted key
+        }
+      }
+    }
+
+    // Fallback: If no address match, return all from global store so the user always sees their activity
+    if (txMap.size === 0) {
+      const globalStored = localStorage.getItem('inter_tx_history_all')
+      if (globalStored) {
+        try {
+          const list: ArcTransaction[] = JSON.parse(globalStored)
+          if (Array.isArray(list)) {
+            for (const item of list) {
+              if (item && item.hash) txMap.set(item.hash.toLowerCase(), item)
+            }
+          }
+        } catch {}
+      }
+    }
+
+    return Array.from(txMap.values()).sort((a, b) => b.timestamp - a.timestamp)
   } catch {
     return []
   }
@@ -89,121 +151,205 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
   const [isError, setIsError] = useState(false)
   const chain = requireChain(ARC_MAINNET_ID)
 
+  // Sync state whenever address becomes available or changes
+  useEffect(() => {
+    const local = getRecordedTransactions(address)
+    setTransactions(local)
+  }, [address])
+
   const fetchTxns = useCallback(async () => {
     if (!address) return
     setIsLoading(true)
     setIsError(false)
+
+    // Load local storage immediately so UI never flickers empty
+    const localTxns = getRecordedTransactions(address)
+    if (localTxns.length > 0) {
+      setTransactions(localTxns)
+    }
+
+    let parsed: ArcTransaction[] = []
+
+    // 1. Try Explorer API (with timeout so it never hangs)
     try {
       const explorerApi = `${chain.explorerBase}/api/v2/addresses/${address}/transactions`
-      const res = await fetch(explorerApi)
-      if (!res.ok) throw new Error('Explorer API error')
-      const data = await res.json() as { items?: ExplorerTx[] }
-      const items = data.items ?? []
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 4000)
+      const res = await fetch(explorerApi, { signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (res.ok) {
+        const data = await res.json() as { items?: ExplorerTx[] }
+        const items = data.items ?? []
+        parsed = items.map((tx) => {
+          const trackedTransfer = tx.token_transfers?.find(
+            (t) => TRACKED_ADDRESSES.has(t.token.address.toLowerCase()),
+          )
 
-      const parsed: ArcTransaction[] = items.map((tx) => {
-        // Find any tracked token transfer (USDC or EURC)
-        const trackedTransfer = tx.token_transfers?.find(
-          (t) => TRACKED_ADDRESSES.has(t.token.address.toLowerCase()),
-        )
+          let rawValue: bigint
+          let formattedValue: string
+          let tokenSymbol: string
 
-        let rawValue: bigint
-        let formattedValue: string
-        let tokenSymbol: string
-
-        if (trackedTransfer) {
-          const tokenInfo = TOKEN_BY_ADDRESS[trackedTransfer.token.address.toLowerCase()]
-          const decimals = tokenInfo?.decimals ?? USDC_DECIMALS
-          rawValue = BigInt(trackedTransfer.total.value)
-          formattedValue = Amount.fromRaw(rawValue, decimals).toFixed(2)
-          tokenSymbol = tokenInfo?.symbol ?? trackedTransfer.token.symbol ?? 'TOKEN'
-        } else {
-          rawValue = BigInt(tx.value || '0')
-          formattedValue = Amount.fromRaw(rawValue / 10n ** 12n, USDC_DECIMALS).toFixed(2)
-          tokenSymbol = 'USDC'
-        }
-
-        const from = tx.from.hash.toLowerCase() as `0x${string}`
-        const to = tx.to?.hash?.toLowerCase() as `0x${string}` | null
-        const addrLower = address.toLowerCase()
-        const toLower = to ?? ''
-
-        const isKnownContract = Boolean(KNOWN_CONTRACTS[toLower])
-        const isContractCall = Boolean(tx.to?.is_contract) || isKnownContract || (Boolean(tx.method) && tx.method !== 'transfer')
-
-        let direction: ArcTransaction['direction'] = 'contract'
-        let txType: ArcTransaction['txType'] = 'contract'
-
-        if (isContractCall) {
-          direction = 'contract'
-          if (isKnownContract) {
-            txType = KNOWN_CONTRACTS[toLower].type
-          } else if (tx.method?.toLowerCase().includes('swap')) {
-            txType = 'swap'
-          } else if (tx.method?.toLowerCase().includes('approve')) {
-            txType = 'approval'
+          if (trackedTransfer) {
+            const tokenInfo = TOKEN_BY_ADDRESS[trackedTransfer.token.address.toLowerCase()]
+            const decimals = tokenInfo?.decimals ?? USDC_DECIMALS
+            rawValue = BigInt(trackedTransfer.total.value)
+            formattedValue = Amount.fromRaw(rawValue, decimals).toFixed(2)
+            tokenSymbol = tokenInfo?.symbol ?? trackedTransfer.token.symbol ?? 'TOKEN'
+          } else {
+            rawValue = BigInt(tx.value || '0')
+            formattedValue = Amount.fromRaw(rawValue / 10n ** 12n, USDC_DECIMALS).toFixed(2)
+            tokenSymbol = 'USDC'
           }
-        } else if (from === addrLower) {
-          direction = 'sent'
-          txType = 'transfer'
-        } else if (to === addrLower) {
-          direction = 'received'
-          txType = 'transfer'
-        }
 
-        const contractName = tx.to?.name ?? KNOWN_CONTRACTS[toLower]?.name ?? (isContractCall ? 'Contract' : undefined)
-        const method = tx.method ?? (isKnownContract ? KNOWN_CONTRACTS[toLower].name : undefined)
+          const from = tx.from.hash.toLowerCase() as `0x${string}`
+          const to = tx.to?.hash?.toLowerCase() as `0x${string}` | null
+          const addrLower = address.toLowerCase()
+          const toLower = to ?? ''
 
-        return {
-          hash: tx.hash,
-          from,
-          to,
-          value: formattedValue,
-          rawValue,
-          tokenSymbol,
-          timestamp: tx.timestamp ? new Date(tx.timestamp).getTime() : 0,
-          status: tx.status === '1' || tx.status === 'ok' ? 'success' : tx.status === '0' ? 'failed' : 'pending',
-          direction,
-          blockNumber: tx.block !== null ? BigInt(tx.block) : null,
-          gasUsed: tx.gas_used ?? '0',
-          contractName,
-          method,
-          txType,
-        }
-      })
+          const isKnownContract = Boolean(KNOWN_CONTRACTS[toLower])
+          const isContractCall = Boolean(tx.to?.is_contract) || isKnownContract || (Boolean(tx.method) && tx.method !== 'transfer')
 
-      // Merge with locally stored transactions
-      const localTxns = getRecordedTransactions(address)
-      const txMap = new Map<string, ArcTransaction>()
+          let direction: ArcTransaction['direction'] = 'contract'
+          let txType: ArcTransaction['txType'] = 'contract'
 
-      for (const t of parsed) txMap.set(t.hash.toLowerCase(), t)
-      for (const t of localTxns) {
-        const key = t.hash.toLowerCase()
-        if (!txMap.has(key)) {
-          txMap.set(key, t)
-        } else {
-          const existing = txMap.get(key)!
-          txMap.set(key, {
-            ...existing,
-            contractName: t.contractName ?? existing.contractName,
-            method: t.method ?? existing.method,
-            txType: t.txType ?? existing.txType,
-            direction: t.direction ?? existing.direction,
-          })
-        }
+          if (isContractCall) {
+            direction = 'contract'
+            if (isKnownContract) {
+              txType = KNOWN_CONTRACTS[toLower].type
+            } else if (tx.method?.toLowerCase().includes('swap')) {
+              txType = 'swap'
+            } else if (tx.method?.toLowerCase().includes('approve')) {
+              txType = 'approval'
+            }
+          } else if (from === addrLower) {
+            direction = 'sent'
+            txType = 'transfer'
+          } else if (to === addrLower) {
+            direction = 'received'
+            txType = 'transfer'
+          }
+
+          const contractName = tx.to?.name ?? KNOWN_CONTRACTS[toLower]?.name ?? (isContractCall ? 'Contract' : undefined)
+          const method = tx.method ?? (isKnownContract ? KNOWN_CONTRACTS[toLower].name : undefined)
+
+          return {
+            hash: tx.hash,
+            from,
+            to,
+            value: formattedValue,
+            rawValue,
+            tokenSymbol,
+            timestamp: tx.timestamp ? new Date(tx.timestamp).getTime() : Date.now(),
+            status: (tx.status === '1' || tx.status === 'ok' ? 'success' : tx.status === '0' ? 'failed' : 'pending') as ArcTransaction['status'],
+            direction,
+            blockNumber: tx.block !== null ? BigInt(tx.block) : null,
+            gasUsed: tx.gas_used ?? '0',
+            contractName,
+            method,
+            txType,
+          }
+        })
       }
-
-      const combined = Array.from(txMap.values()).sort((a, b) => b.timestamp - a.timestamp)
-      setTransactions(combined)
     } catch {
-      setIsError(true)
-      const localTxns = getRecordedTransactions(address)
-      if (localTxns.length > 0) {
-        setTransactions(localTxns)
-      }
-    } finally {
-      setIsLoading(false)
+      // Explorer API unavailable or CORS/Cloudflare protected — gracefully continue with local & RPC
     }
-  }, [address, chain.explorerBase])
+
+    // 2. Try Arc RPC getLogs for past blocks to catch onchain ERC-20 transfers
+    try {
+      const rpc = chain.rpcUrls[0]
+      if (rpc) {
+        const addrPadded = '0x000000000000000000000000' + address.slice(2).toLowerCase()
+        const blockRes = await fetch(rpc, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
+        })
+        const blockNumHex = (await blockRes.json()).result
+        const blockNum = parseInt(blockNumHex, 16)
+        if (blockNum > 0) {
+          const fromBlock = '0x' + Math.max(0, blockNum - 2500).toString(16)
+          const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
+          const [sentRes, recvRes] = await Promise.all([
+            fetch(rpc, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 2,
+                method: 'eth_getLogs',
+                params: [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, addrPadded] }],
+              }),
+            }),
+            fetch(rpc, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 3,
+                method: 'eth_getLogs',
+                params: [{ fromBlock, toBlock: 'latest', topics: [TRANSFER_TOPIC, null, addrPadded] }],
+              }),
+            }),
+          ])
+          const sentLogs = (await sentRes.json()).result ?? []
+          const recvLogs = (await recvRes.json()).result ?? []
+          const allLogs = [...sentLogs, ...recvLogs]
+
+          for (const log of allLogs) {
+            const tokenAddr = log.address.toLowerCase()
+            const tokenInfo = TOKEN_BY_ADDRESS[tokenAddr] ?? TOKENS[0]
+            const rawVal = BigInt(log.data === '0x' ? '0' : log.data)
+            const fromAddr = ('0x' + log.topics[1].slice(26)).toLowerCase() as `0x${string}`
+            const toAddr = ('0x' + log.topics[2].slice(26)).toLowerCase() as `0x${string}`
+            const isSent = fromAddr === address.toLowerCase()
+
+            parsed.push({
+              hash: log.transactionHash,
+              from: fromAddr,
+              to: toAddr,
+              value: Amount.fromRaw(rawVal, tokenInfo.decimals).toFixed(2),
+              rawValue: rawVal,
+              tokenSymbol: tokenInfo.symbol,
+              timestamp: Date.now(),
+              status: 'success',
+              direction: isSent ? 'sent' : 'received',
+              blockNumber: BigInt(log.blockNumber),
+              gasUsed: '0',
+              txType: 'transfer',
+            })
+          }
+        }
+      }
+    } catch {
+      // RPC getLogs fallback failed — local store will serve data
+    }
+
+    // Merge parsed explorer/RPC txns with all recorded local transactions
+    const freshLocal = getRecordedTransactions(address)
+    const txMap = new Map<string, ArcTransaction>()
+
+    for (const t of freshLocal) txMap.set(t.hash.toLowerCase(), t)
+    for (const t of parsed) {
+      const key = t.hash.toLowerCase()
+      if (!txMap.has(key)) {
+        txMap.set(key, t)
+      } else {
+        const existing = txMap.get(key)!
+        txMap.set(key, {
+          ...existing,
+          ...t,
+          status: existing.status === 'success' ? 'success' : t.status,
+          contractName: existing.contractName ?? t.contractName,
+          method: existing.method ?? t.method,
+          txType: existing.txType ?? t.txType,
+        })
+      }
+    }
+
+    const combined = Array.from(txMap.values()).sort((a, b) => b.timestamp - a.timestamp)
+    setTransactions(combined)
+    setIsLoading(false)
+  }, [address, chain.explorerBase, chain.rpcUrls])
 
   // Sync with block explorer API + listen for local recorded transactions
   /* oxlint-disable react/set-state-in-effect */
@@ -211,7 +357,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
     void fetchTxns()
     const handleRecorded = () => { void fetchTxns() }
     window.addEventListener('inter_tx_recorded', handleRecorded)
-    const interval = setInterval(() => void fetchTxns(), 30_000)
+    const interval = setInterval(() => void fetchTxns(), 25_000)
     return () => {
       window.removeEventListener('inter_tx_recorded', handleRecorded)
       clearInterval(interval)

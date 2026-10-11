@@ -294,6 +294,7 @@ export function useTowerSwap(slippageBps = 50) {
       }
 
       // Step 2: Swap
+      let broadcastHash: string | undefined = undefined
       setSwapState({ status: 'swapping' })
       const txHash = await walletClient.sendTransaction({
         account: viemAcct,
@@ -301,10 +302,30 @@ export function useTowerSwap(slippageBps = 50) {
         data: txData.swap.data as `0x${string}`,
         value: BigInt(txData.swap.value ?? '0'),
       })
+      broadcastHash = txHash
+
+      // Record immediately as pending
+      recordTransaction({
+        hash: txHash,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: (txData.swap.to as string).toLowerCase() as `0x${string}`,
+        value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
+        rawValue: parsedIn,
+        tokenSymbol: tokenIn.symbol,
+        timestamp: Date.now(),
+        status: 'pending',
+        direction: 'contract',
+        blockNumber: null,
+        gasUsed: '0',
+        contractName: 'Tower DEX Router',
+        method: 'Execute Swap',
+        txType: 'swap',
+      })
 
       setSwapState({ status: 'swapping', txHash })
       await publicClient.waitForTransactionReceipt({ hash: txHash })
 
+      // Update to success upon confirmation
       recordTransaction({
         hash: txHash,
         from: account.address.toLowerCase() as `0x${string}`,
@@ -325,6 +346,26 @@ export function useTowerSwap(slippageBps = 50) {
       setSwapState({ status: 'success', txHash, amountOut, dexName })
     } catch (err) {
       const clean = parseOnchainError(err)
+      const parsedIn = parseAmountSafe(amountIn, tokenIn.decimals) ?? 0n
+
+      // Record as failed transaction so Activity screen displays it under 'failed' and 'swaps'
+      recordTransaction({
+        hash: `0x${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: tokenIn.address.toLowerCase() as `0x${string}`,
+        value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
+        rawValue: parsedIn,
+        tokenSymbol: tokenIn.symbol,
+        timestamp: Date.now(),
+        status: 'failed',
+        direction: 'contract',
+        blockNumber: null,
+        gasUsed: '0',
+        contractName: 'Tower DEX Router',
+        method: 'Execute Swap',
+        txType: 'swap',
+      })
+
       setSwapState({ status: 'error', message: clean })
     }
   }, [account, swapState, amountIn, tokenIn])

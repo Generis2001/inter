@@ -325,9 +325,28 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
         value: 0n,
       })
 
+      // Record immediately as pending
+      recordTransaction({
+        hash: txHash,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: UNIVERSAL_ROUTER.toLowerCase() as `0x${string}`,
+        value: Amount.fromRaw(parsed, tokenIn.decimals).toFixed(2),
+        rawValue: parsed,
+        tokenSymbol: tokenIn.symbol,
+        timestamp: Date.now(),
+        status: 'pending',
+        direction: 'contract',
+        blockNumber: null,
+        gasUsed: '0',
+        contractName: 'Uniswap v4 Router',
+        method: 'Execute V4 Swap',
+        txType: 'swap',
+      })
+
       setSwapState({ status: 'swapping', txHash })
       await publicClient.waitForTransactionReceipt({ hash: txHash })
 
+      // Update to success upon confirmation
       recordTransaction({
         hash: txHash,
         from: account.address.toLowerCase() as `0x${string}`,
@@ -352,6 +371,26 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
       })
     } catch (err) {
       const clean = parseOnchainError(err)
+      const parsedIn = parseAmountSafe(amountIn, tokenIn.decimals) ?? 0n
+
+      // Record as failed transaction so Activity screen displays it under 'failed' and 'swaps'
+      recordTransaction({
+        hash: `0x${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: UNIVERSAL_ROUTER.toLowerCase() as `0x${string}`,
+        value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
+        rawValue: parsedIn,
+        tokenSymbol: tokenIn.symbol,
+        timestamp: Date.now(),
+        status: 'failed',
+        direction: 'contract',
+        blockNumber: null,
+        gasUsed: '0',
+        contractName: 'Uniswap v4 Router',
+        method: 'Execute V4 Swap',
+        txType: 'swap',
+      })
+
       setSwapState({ status: 'error', message: clean })
     }
   }, [account, amountIn, tokenIn, tokenOut])

@@ -29,17 +29,22 @@ interface DashboardScreenProps {
   onShowSend: () => void
   onShowReceive: () => void
   transactions: ArcTransaction[]
+  isLoading?: boolean
 }
 
 function TxRow({ tx }: { tx: ArcTransaction }) {
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
   const isFailed = tx.status === 'failed'
-  const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
+  const isPending = tx.status === 'pending'
+  const isSwap = tx.txType === 'swap' || (tx.contractName ?? '').toLowerCase().includes('tower') || (tx.contractName ?? '').toLowerCase().includes('uniswap')
+  const isTower = isSwap && (tx.contractName ?? '').toLowerCase().includes('tower')
 
-  const title = isContract
-    ? (tx.method ?? tx.contractName ?? 'Contract')
-    : (isSent ? 'Sent' : 'Received')
+  const title = isSwap
+    ? 'Swap'
+    : isContract
+      ? (tx.method ?? tx.contractName ?? 'Contract')
+      : (isSent ? 'Sent' : 'Received')
 
   const subtitle = isContract
     ? (tx.contractName ? `${tx.contractName} · ${tx.to ? formatAddress(tx.to) : 'Contract'}` : (tx.to ? formatAddress(tx.to) : 'Contract'))
@@ -57,15 +62,21 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
         style={{
           background: isFailed
             ? 'rgba(220,38,38,0.10)'
-            : isContract
-              ? 'rgba(6,182,212,0.14)'
-              : isSent ? 'rgba(6,182,212,0.10)' : 'rgba(5,150,105,0.10)',
+            : isPending
+              ? 'rgba(234,179,8,0.12)'
+              : isSwap
+                ? 'rgba(6,182,212,0.14)'
+                : isContract
+                  ? 'rgba(6,182,212,0.14)'
+                  : isSent ? 'rgba(6,182,212,0.10)' : 'rgba(5,150,105,0.10)',
         }}
       >
         {isFailed ? (
           <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
-        ) : isContract && isTower ? (
+        ) : isTower ? (
           <TowerLogo size={16} />
+        ) : isSwap ? (
+          <RefreshCw className="size-4" style={{ color: 'var(--accent)' }} />
         ) : isContract ? (
           <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
         ) : isSent ? (
@@ -81,7 +92,28 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
             <p className="text-sm font-semibold truncate max-w-[150px]" style={{ color: 'var(--ink)' }}>
               {title}
             </p>
-            {isContract ? (
+            {isFailed ? (
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                style={{ background: 'rgba(220,38,38,0.12)', color: 'var(--danger)' }}
+              >
+                Failed
+              </span>
+            ) : isPending ? (
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                style={{ background: 'rgba(234,179,8,0.14)', color: '#ca8a04' }}
+              >
+                Pending
+              </span>
+            ) : isSwap ? (
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
+              >
+                Swap
+              </span>
+            ) : isContract ? (
               <span
                 className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
                 style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
@@ -128,15 +160,21 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
   )
 }
 
-export function DashboardScreen({ onNavigate, onShowSend, onShowReceive, transactions }: DashboardScreenProps) {
+export function DashboardScreen({
+  onNavigate,
+  onShowSend,
+  onShowReceive,
+  transactions,
+  isLoading = false,
+}: DashboardScreenProps) {
   const { account } = useWallet()
   const address = account?.address
   const usdc = TOKENS[0]
   const eurc = TOKENS[1]
   const { formatted: usdcFormatted, isLoading: usdcLoading, refetch: refetchUsdc } = useTokenBalance(usdc, address)
   const { formatted: eurcFormatted, isLoading: eurcLoading, refetch: refetchEurc } = useTokenBalance(eurc, address)
-  const txLoading = (transactions).length === 0
-  const recentTxnsTyped: ArcTransaction[] = (transactions).slice(0, 5)
+  const txLoading = isLoading
+  const recentTxnsTyped: ArcTransaction[] = transactions.slice(0, 5)
   const [copied, setCopied] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
 
