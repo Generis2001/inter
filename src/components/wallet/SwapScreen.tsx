@@ -11,6 +11,9 @@ import { useWallet } from '../../context/WalletContext'
 import { TokenIcon } from '../shared/TokenLogo'
 import { TowerLogo } from '../shared/TowerLogo'
 import { buildTxExplorerUrl } from '@/onchain-facts'
+import { Amount } from '@/onchain-money'
+import { TOKENS } from '../../utils/tokens'
+import { useBalance, useGasPrice } from 'wagmi'
 import {
   ArrowUpDown,
   Loader2,
@@ -49,8 +52,16 @@ export function SwapScreen() {
   } = useSwap()
 
   const queryClient = useQueryClient()
-  const { formatted: balanceIn, isLoading: balIn, refetch: refetchIn } = useTokenBalance(tokenIn, account?.address)
+  const { formatted: balanceIn, raw: rawBalanceIn, isLoading: balIn, refetch: refetchIn } = useTokenBalance(tokenIn, account?.address)
   const { formatted: balanceOut, refetch: refetchOut } = useTokenBalance(tokenOut, account?.address)
+  const { raw: usdcRaw, refetch: refetchUsdc } = useTokenBalance(TOKENS[0], account?.address)
+
+  // Native Arc gas token balance (18 decimals USDC)
+  const { data: nativeBalance, refetch: refetchNative } = useBalance({
+    address: account?.address,
+    chainId: ARC_MAINNET_ID,
+  })
+  const { data: gasPrice } = useGasPrice({ chainId: ARC_MAINNET_ID })
 
   // Slippage settings panel state
   const [showSlippage, setShowSlippage] = useState(false)
@@ -72,10 +83,14 @@ export function SwapScreen() {
       void queryClient.invalidateQueries()
       void refetchIn()
       void refetchOut()
+      void refetchUsdc()
+      void refetchNative()
       const t1 = setTimeout(() => {
         void queryClient.invalidateQueries()
         void refetchIn()
         void refetchOut()
+        void refetchUsdc()
+        void refetchNative()
       }, 1500)
       const t2 = setTimeout(() => {
         void queryClient.invalidateQueries()
@@ -85,7 +100,7 @@ export function SwapScreen() {
         clearTimeout(t2)
       }
     }
-  }, [swapState.status, queryClient, refetchIn, refetchOut])
+  }, [swapState.status, queryClient, refetchIn, refetchOut, refetchUsdc, refetchNative])
 
   const isQuoting   = swapState.status === 'quoting'
   const isQuoted    = swapState.status === 'quoted'
@@ -95,11 +110,66 @@ export function SwapScreen() {
   const isError     = swapState.status === 'error'
 
   const busy     = isApproving || isSwapping
-  const canSwap  = isQuoted && !!account
   const hasInput = !!amountIn && parseFloat(amountIn) > 0
 
+  // Swap gas requirement on Arc:
+  // Typical swap tx costs ~300k gas (or ~400k with ERC-20 approval).
+  // Arc native token is USDC (18 decimals).
+  const currentGasPrice = gasPrice ?? 20_000_000_000n
+  const minRequiredGasWei = currentGasPrice * 350_000n // ~0.007 USDC in 18 decimals
+  const minRequiredGasUsdcRaw = 7_000n // 0.007 USDC in 6-decimal raw
+
+  const parsedAmountIn = (() => {
+    if (!amountIn || amountIn === '0' || amountIn === '0.') return null
+    try {
+      return Amount.parse(amountIn, tokenIn.decimals).raw
+    } catch {
+      return null
+    }
+  })()
+
+  // Token balance validation (amount entered exceeds balance of token being swapped)
+  const hasInsufficientTokenBalance =
+    !!account &&
+    parsedAmountIn !== null &&
+    rawBalanceIn !== undefined &&
+    parsedAmountIn > rawBalanceIn
+
+  // Gas balance validation (USDC is native fee token on Arc)
+  const hasInsufficientGas = (() => {
+    if (!account) return false
+    // 1. If native gas balance is loaded and below required threshold
+    if (nativeBalance !== undefined && nativeBalance.value < minRequiredGasWei) {
+      return true
+    }
+    // 2. If swapping USDC, ensure enough USDC remains to pay network gas
+    if (tokenIn.symbol === 'USDC' && parsedAmountIn !== null && rawBalanceIn !== undefined) {
+      if (parsedAmountIn + minRequiredGasUsdcRaw > rawBalanceIn) {
+        return true
+      }
+    }
+    // 3. If swapping EURC, ensure account has at least min USDC for gas
+    if (tokenIn.symbol === 'EURC') {
+      if (usdcRaw !== undefined && usdcRaw < minRequiredGasUsdcRaw && (nativeBalance === undefined || nativeBalance.value < minRequiredGasWei)) {
+        return true
+      }
+    }
+    return false
+  })()
+
+  const canSwap = isQuoted && !!account && !hasInsufficientGas && !hasInsufficientTokenBalance
+
   const handleMax = () => {
-    if (balanceIn) setAmountIn(balanceIn.replace(/[^0-9.]/g, ''))
+    if (!balanceIn) return
+    const num = parseFloat(balanceIn.replace(/[^0-9.]/g, ''))
+    if (isNaN(num)) return
+    if (tokenIn.symbol === 'USDC') {
+      // Reserve ~0.007 USDC to cover network transaction gas on Arc
+      const reserved = Math.max(0, num - 0.007)
+      setAmountIn(reserved > 0 ? (reserved < 0.01 ? reserved.toFixed(4) : reserved.toFixed(2)) : '0')
+    } else {
+      setAmountIn(balanceIn.replace(/[^0-9.]/g, ''))
+    }
   }
 
   const handleSlippagePreset = (pct: number) => {
@@ -457,7 +527,14 @@ export function SwapScreen() {
                         label: 'Max slippage',
                         value: `${(slippageBps / 100).toFixed(slippageBps % 100 === 0 ? 1 : 2)}%`,
                       },
-                      { label: 'Network fee', value: 'Paid in USDC' },
+                      {
+                        label: 'Network fee',
+                        value: hasInsufficientGas ? (
+                          <span style={{ color: 'var(--danger)' }}>Paid in USDC (Insufficient gas)</span>
+                        ) : (
+                          'Paid in USDC'
+                        ),
+                      },
                     ] as { label: string; value: React.ReactNode }[]).map(({ label, value }) => (
                       <div key={label} className="flex items-center justify-between py-1">
                         <span className="text-xs" style={{ color: 'var(--subtle)' }}>{label}</span>
@@ -492,6 +569,27 @@ export function SwapScreen() {
         )}
       </AnimatePresence>
 
+      {/* Insufficient gas or token warning banner BEFORE swap */}
+      <AnimatePresence>
+        {hasInsufficientGas && hasInput && !isError && (
+          <motion.div
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="mt-4 flex items-center gap-2.5 rounded-2xl p-3.5"
+            style={{
+              background: 'rgba(186,43,76,0.08)',
+              border: '1px solid rgba(186,43,76,0.22)',
+            }}
+          >
+            <AlertTriangle className="size-4 shrink-0" style={{ color: 'var(--danger)' }} />
+            <p className="text-xs font-semibold" style={{ color: 'var(--danger)' }}>
+              insufficient gas (USDC) — Arc network requires a small USDC balance for transaction fees.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Error banner */}
       <AnimatePresence>
         {isError && swapState.status === 'error' && (
@@ -503,7 +601,7 @@ export function SwapScreen() {
             style={{ background: 'rgba(186,43,76,0.06)', border: '1px solid rgba(186,43,76,0.16)' }}
           >
             <AlertTriangle className="mt-0.5 size-4 shrink-0" style={{ color: 'var(--danger)' }} />
-            <p className="text-sm" style={{ color: 'var(--danger)' }}>
+            <p className="text-sm font-medium" style={{ color: 'var(--danger)' }}>
               {swapState.message}
             </p>
           </motion.div>
@@ -534,10 +632,18 @@ export function SwapScreen() {
             onClick={() => { void executeSwap() }}
             disabled={!canSwap}
             className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
-            style={{ background: canSwap ? 'var(--accent-gradient)' : 'rgba(18,45,69,0.12)' }}
+            style={{
+              background: canSwap
+                ? 'var(--accent-gradient)'
+                : hasInsufficientGas || hasInsufficientTokenBalance
+                ? 'rgba(186,43,76,0.45)'
+                : 'rgba(18,45,69,0.12)',
+            }}
           >
             {isError ? (
-              'Try Again'
+              swapState.message.toLowerCase().includes('insufficient gas')
+                ? 'insufficient gas (USDC)'
+                : 'Try Again'
             ) : !hasInput ? (
               'Enter an amount'
             ) : isQuoting ? (
@@ -545,6 +651,10 @@ export function SwapScreen() {
                 <Loader2 className="size-4 animate-spin" />
                 Getting quote...
               </>
+            ) : hasInsufficientTokenBalance ? (
+              `Insufficient ${tokenIn.symbol} balance`
+            ) : hasInsufficientGas ? (
+              'insufficient gas (USDC)'
             ) : isQuoted ? (
               <>
                 Swap <ChevronRight className="size-4" />

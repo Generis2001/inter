@@ -23,6 +23,7 @@ import { useWallet } from '../context/WalletContext'
 import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
 import { recordTransaction } from './useArcTransactions'
+import { parseOnchainError } from '../utils/wallet'
 
 const TOWER_BASE = 'https://www.tower.exchange/api/public'
 const ARC_CHAIN_ID = 5042
@@ -226,6 +227,18 @@ export function useTowerSwap(slippageBps = 50) {
       type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A } ? NonNullable<A> : never
       const viemAcct   = account as unknown as ViemAccount
       const publicClient  = getPublicClient()
+
+      // Pre-flight check on Arc native gas balance before broadcasting
+      try {
+        const nativeBal = await publicClient.getBalance({ address: account.address })
+        if (nativeBal < 3_000_000_000_000_000n) { // less than 0.003 USDC in 18 decimals
+          setSwapState({ status: 'error', message: 'insufficient gas (USDC)' })
+          return
+        }
+      } catch {
+        // Proceed if client check fails
+      }
+
       const walletClient  = createWalletClient({ account: viemAcct, chain: arc, transport: http() })
 
       // Build tx calldata from Tower
@@ -311,9 +324,8 @@ export function useTowerSwap(slippageBps = 50) {
 
       setSwapState({ status: 'success', txHash, amountOut, dexName })
     } catch (err) {
-      const msg   = err instanceof Error ? err.message : String(err)
-      const clean = msg.replace(/^.*?(ContractFunctionExecutionError|Error):\s*/i, '').slice(0, 200)
-      setSwapState({ status: 'error', message: clean || 'Swap failed. Please try again.' })
+      const clean = parseOnchainError(err)
+      setSwapState({ status: 'error', message: clean })
     }
   }, [account, swapState, amountIn, tokenIn])
 

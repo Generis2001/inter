@@ -27,6 +27,7 @@ import { useWallet } from '../context/WalletContext'
 import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
 import { recordTransaction } from './useArcTransactions'
+import { parseOnchainError } from '../utils/wallet'
 
 // Arc Mainnet contract addresses
 // Universal Router 2.1.2 on Arc (with Uniswap v4 support)
@@ -249,6 +250,18 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
     try {
       type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A } ? NonNullable<A> : never
       const viemAcct   = account as unknown as ViemAccount
+
+      // Pre-flight check on Arc native gas balance before broadcasting
+      try {
+        const nativeBal = await publicClient.getBalance({ address: account.address })
+        if (nativeBal < 3_000_000_000_000_000n) {
+          setSwapState({ status: 'error', message: 'insufficient gas (USDC)' })
+          return
+        }
+      } catch {
+        // Proceed if client check fails
+      }
+
       const walletClient = createWalletClient({ account: viemAcct, chain: arc, transport: http() })
 
       // Step 1: Ensure ERC-20 -> Permit2 approval
@@ -338,9 +351,8 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
         amountOut: Amount.fromRaw(quotedOut, tokenOut.decimals),
       })
     } catch (err) {
-      const msg   = err instanceof Error ? err.message : String(err)
-      const clean = msg.replace(/^.*?(ContractFunctionExecutionError|Error):\s*/i, '').slice(0, 180)
-      setSwapState({ status: 'error', message: clean || 'Swap failed. Please try again.' })
+      const clean = parseOnchainError(err)
+      setSwapState({ status: 'error', message: clean })
     }
   }, [account, amountIn, tokenIn, tokenOut])
 

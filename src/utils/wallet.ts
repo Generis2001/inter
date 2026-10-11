@@ -91,15 +91,30 @@ export function isValidAddress(addr: string): boolean {
 
 /** Parse onchain error into user-friendly message */
 export function parseOnchainError(error: unknown): string {
-  const msg = (error as { message?: string })?.message?.toLowerCase() ?? ''
+  const rawMsg = (error as { message?: string })?.message ?? String(error)
+  const msg = rawMsg.toLowerCase()
+
   if (msg.includes('user rejected') || (error as { code?: number })?.code === 4001) {
     return 'Transaction cancelled.'
   }
-  if (msg.includes('insufficient funds') || msg.includes('exceeds balance')) {
-    return 'Insufficient balance. Please add funds and try again.'
+
+  // Insufficient gas / account balance exceeds error on Arc (USDC is gas token)
+  if (
+    msg.includes('exceeds the balance') ||
+    msg.includes('exceeds balance') ||
+    msg.includes('total cost (gas * gas fee + value)') ||
+    msg.includes('pay for the total gas') ||
+    msg.includes('insufficient funds for gas') ||
+    msg.includes('insufficient funds for intrinsic transaction cost') ||
+    msg.includes('intrinsic gas too low') ||
+    msg.includes('insufficient gas') ||
+    msg.includes('insufficient funds')
+  ) {
+    return 'insufficient gas (USDC)'
   }
+
   if (msg.includes('reverted')) {
-    const m = msg.match(/reason="([^"]+)"/)
+    const m = rawMsg.match(/reason="([^"]+)"/)
     return m ? `Transaction failed: ${m[1]}` : 'Transaction failed. Please try again.'
   }
   if (msg.includes('network') || msg.includes('timeout')) {
