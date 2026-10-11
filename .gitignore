@@ -34,3 +34,6 @@ traces.jsonl
 android/app/build/
 android/build/
 android/.gradle/
+apk-release/
+extension-release/
+unpacked-extension/
