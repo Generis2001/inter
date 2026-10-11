@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Inter</string>
+    <string name="title_activity_main">Inter</string>
+    <string name="package_name">network.inter.wallet</string>
+    <string name="custom_url_scheme">network.inter.wallet</string>
+</resources>

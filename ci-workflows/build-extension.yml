@@ -1,0 +1,42 @@
+name: Build Chrome Extension
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-extension:
+    name: Build & Package Chrome Extension
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Build Web Assets (Includes Manifest V3)
+        run: npm run build
+
+      - name: Package Chrome Extension ZIP
+        run: |
+          cd dist
+          zip -r ../inter-chrome-extension.zip ./*
+
+      - name: Upload Extension Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Inter-Chrome-Extension
+          path: inter-chrome-extension.zip
+          retention-days: 30

@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:extension": "node scripts/package-extension.js",
+    "build:icons": "node scripts/generate-icons.js",
+    "cap:sync": "cap sync android",
+    "cap:open": "cap open android",
     "deploy:self": "bun run ./scripts/self-deploy.ts",
     "compass:deploy": "bun run ./scripts/compass-deploy.ts",
     "fetch:abi": "bun run ./scripts/fetch-abi.ts",
@@ -16,6 +20,8 @@
     "contracts:test": "forge test"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
     "@circle-fin/adapter-viem-v2": "^1.18.0",
     "@circle-fin/app-kit": "^1.15.2",
     "@circle-fin/developer-controlled-wallets": "^10.8.0",
@@ -43,6 +49,7 @@
     "viem": "^2.56.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
     "@types/node": "^24.0.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

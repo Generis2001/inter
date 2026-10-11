@@ -25,6 +25,15 @@ import './index.css'
 
 const queryClient = new QueryClient()
 
+// Auto-detect Chrome extension popup mode (under 500px in extension context)
+if (typeof window !== 'undefined') {
+  const isExtension = window.location.protocol.includes('extension') || Boolean((window as unknown as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id)
+  const isPopup = isExtension && window.innerWidth < 500 && !window.location.search.includes('full')
+  if (isPopup) {
+    document.documentElement.classList.add('is-extension-popup')
+  }
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <WagmiProvider config={config}>

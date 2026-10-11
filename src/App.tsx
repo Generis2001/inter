@@ -20,7 +20,7 @@ import { useNotifications } from './hooks/useNotifications'
 import { useArcNSPrimaryName } from './hooks/useArcNSPrimaryName'
 import { InterLogo } from './components/shared/InterLogo'
 import { WalletIdenticon } from './components/shared/WalletIdenticon'
-import { Bell } from 'lucide-react'
+import { Bell, PanelRight } from 'lucide-react'
 
 // Inner component so it can access WalletContext
 function WalletApp() {
@@ -96,8 +96,28 @@ function WalletApp() {
           </span>
         </div>
 
-        {/* Bell + avatar */}
+        {/* Bell + Sidepanel + avatar */}
         <div className="flex items-center gap-2">
+          {/* Side panel toggle button for Chrome Extension */}
+          {typeof window !== 'undefined' && Boolean((window as unknown as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id) && (
+            <button
+              onClick={() => {
+                try {
+                  const c = (window as unknown as { chrome?: { runtime?: { sendMessage?: (msg: unknown) => void } } }).chrome
+                  c?.runtime?.sendMessage?.({ action: 'OPEN_SIDEPANEL' })
+                  setTimeout(() => window.close(), 150)
+                } catch {
+                  // ignore if not supported
+                }
+              }}
+              className="flex items-center justify-center rounded-2xl p-2 transition-all hover:bg-black/5"
+              title="Open in Chrome Side Panel"
+              aria-label="Open in Chrome Side Panel"
+            >
+              <PanelRight className="size-5" style={{ color: 'var(--muted)' }} />
+            </button>
+          )}
+
           {/* Notification bell */}
           <button
             onClick={() => setNotifOpen((v) => !v)}

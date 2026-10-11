@@ -28,3 +28,9 @@ Thumbs.db
 *.log
 console.jsonl
 traces.jsonl
+
+# Native & extension builds
+*.zip
+android/app/build/
+android/build/
+android/.gradle/
