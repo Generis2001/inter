@@ -2,6 +2,8 @@
  * SwapScreen — USDC <-> EURC swap.
  * Tower Exchange (primary) or Uniswap v4 Universal Router (secondary).
  */
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useSwap, type SwapRoute } from '../../hooks/useSwap'
 import { useTokenBalance } from '../../hooks/useTokenBalance'
 import { useWallet } from '../../context/WalletContext'
@@ -40,8 +42,30 @@ export function SwapScreen() {
     reset,
   } = useSwap()
 
-  const { formatted: balanceIn, isLoading: balIn } = useTokenBalance(tokenIn, account?.address)
-  const { formatted: balanceOut } = useTokenBalance(tokenOut, account?.address)
+  const queryClient = useQueryClient()
+  const { formatted: balanceIn, isLoading: balIn, refetch: refetchIn } = useTokenBalance(tokenIn, account?.address)
+  const { formatted: balanceOut, refetch: refetchOut } = useTokenBalance(tokenOut, account?.address)
+
+  // Invalidate and refresh all balance queries across the wallet immediately on swap completion
+  useEffect(() => {
+    if (swapState.status === 'success') {
+      void queryClient.invalidateQueries()
+      void refetchIn()
+      void refetchOut()
+      const t1 = setTimeout(() => {
+        void queryClient.invalidateQueries()
+        void refetchIn()
+        void refetchOut()
+      }, 1500)
+      const t2 = setTimeout(() => {
+        void queryClient.invalidateQueries()
+      }, 3500)
+      return () => {
+        clearTimeout(t1)
+        clearTimeout(t2)
+      }
+    }
+  }, [swapState.status, queryClient, refetchIn, refetchOut])
 
   const isQuoting   = swapState.status === 'quoting'
   const isQuoted    = swapState.status === 'quoted'
@@ -99,7 +123,10 @@ export function SwapScreen() {
           View on Arc Explorer <ExternalLink className="size-4" />
         </a>
         <button
-          onClick={reset}
+          onClick={() => {
+            void queryClient.invalidateQueries()
+            reset()
+          }}
           className="w-full max-w-sm rounded-2xl py-4 text-sm font-semibold text-white"
           style={{ background: 'var(--accent)' }}
         >

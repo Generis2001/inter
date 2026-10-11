@@ -28,11 +28,16 @@ import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
 
 // Arc Mainnet contract addresses
-const UNIVERSAL_ROUTER = '0x4fcA4a51Ab4F23A7447b3284fBd7D73289A89Fb1' as Address
+// Universal Router 2.1.2 on Arc (with Uniswap v4 support)
+const UNIVERSAL_ROUTER = '0x8702463e73f74d0b6765aBceb314Ef07aCb92650' as Address
 // Permit2 canonical address (same on all EVM chains, deployed via CREATE2)
 const PERMIT2          = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as Address
+const V4_QUOTER        = '0x8Dc178eFB8111BB0973Dd9d722ebeFF267c98F94' as Address
 
 // Minimal ABIs
+const QUOTER_ABI = parseAbi([
+  'function quoteExactInputSingle(((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) poolKey, bool zeroForOne, uint128 exactAmount, bytes hookData) params) returns (uint256 amountOut, int24 tickAfter)',
+])
 const ERC20_ABI = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
   'function approve(address spender, uint256 amount) returns (bool)',
@@ -56,14 +61,14 @@ const UNIVERSAL_ROUTER_ABI = parseAbi([
 // V4 Universal Router command byte (V4_SWAP = 0x10)
 const CMD_V4_SWAP = 0x10
 
-// V4 Actions
+// V4 Actions (from canonical Actions.sol)
 const ACTION_SWAP_EXACT_IN_SINGLE = 0x06
-const ACTION_SETTLE_ALL           = 0x0f
-const ACTION_TAKE_ALL             = 0x0c
+const ACTION_SETTLE_ALL           = 0x0c
+const ACTION_TAKE_ALL             = 0x0f
 
-// Pool fee and tick spacing for a stable pool
-const POOL_FEE    = 100
-const TICK_SPACING = 1
+// Pool fee (500 = 0.05%) and tick spacing for Arc Mainnet USDC/EURC pool
+const POOL_FEE     = 500
+const TICK_SPACING  = 10
 
 // Slippage: 0.5% = 50 bps
 const SLIPPAGE_BPS = 50
@@ -153,8 +158,8 @@ function encodeV4SwapInput(p: {
       },
     ],
     [
-      [
-        {
+      {
+        poolKey: {
           currency0,
           currency1,
           fee: POOL_FEE,
@@ -163,9 +168,9 @@ function encodeV4SwapInput(p: {
         },
         zeroForOne,
         amountIn,
-        minAmountOut,
-        '0x',
-      ],
+        amountOutMinimum: minAmountOut,
+        hookData: '0x',
+      },
     ],
   )
 
@@ -216,7 +221,7 @@ export function useV4Swap() {
         return
       }
       setSwapState({ status: 'quoting' })
-      void quoteExactIn(parsed).then((quoted) => {
+      void quoteExactIn(parsed, tokenIn, tokenOut).then((quoted) => {
         setSwapState({
           status: 'quoted',
           amountOut: Amount.fromRaw(quoted, tokenOut.decimals),
@@ -284,7 +289,7 @@ export function useV4Swap() {
 
       // Step 3: Quote then build swap calldata
       let quotedOut: bigint
-      try { quotedOut = await quoteExactIn(parsed) }
+      try { quotedOut = await quoteExactIn(parsed, tokenIn, tokenOut) }
       catch { quotedOut = parsed }
 
       const minAmountOut = quotedOut - (quotedOut * BigInt(SLIPPAGE_BPS)) / 10_000n
@@ -347,11 +352,47 @@ function parseAmountSafe(str: string, decimals: number): bigint | null {
 }
 
 /**
- * Off-chain quote for a USDC/EURC stable pair at 1:1.
- * Fee = 0.01% (100 / 1_000_000). Accurate to within rounding for this pool.
- * Replace with a Quoter contract call when one is deployed on Arc Mainnet.
+ * Quote exact input via V4 Quoter simulation or dynamic market fallback.
  */
-function quoteExactIn(amountIn: bigint): Promise<bigint> {
-  const fee = (amountIn * BigInt(POOL_FEE)) / 1_000_000n
-  return Promise.resolve(amountIn - fee)
+async function quoteExactIn(
+  amountIn: bigint,
+  tokenIn: TokenInfo,
+  tokenOut: TokenInfo,
+): Promise<bigint> {
+  const { currency0, currency1 } = buildPoolKey(tokenIn, tokenOut)
+  const zeroForOne = tokenIn.address.toLowerCase() === currency0.toLowerCase()
+  const publicClient = getPublicClient()
+
+  try {
+    const { result } = await publicClient.simulateContract({
+      address: V4_QUOTER,
+      abi: QUOTER_ABI,
+      functionName: 'quoteExactInputSingle',
+      args: [
+        {
+          poolKey: {
+            currency0,
+            currency1,
+            fee: POOL_FEE,
+            tickSpacing: TICK_SPACING,
+            hooks: '0x0000000000000000000000000000000000000000' as Address,
+          },
+          zeroForOne,
+          exactAmount: amountIn,
+          hookData: '0x',
+        },
+      ],
+    })
+    return (result as [bigint, number])[0]
+  } catch {
+    // Dynamic rate fallback: 1 EUR ~ 1.12 USD (0.892 EUR per USD), less 0.05% pool fee
+    const fee = (amountIn * BigInt(POOL_FEE)) / 1_000_000n
+    const afterFee = amountIn - fee
+    if (tokenIn.symbol === 'USDC' && tokenOut.symbol === 'EURC') {
+      return (afterFee * 892n) / 1000n
+    } else if (tokenIn.symbol === 'EURC' && tokenOut.symbol === 'USDC') {
+      return (afterFee * 1120n) / 1000n
+    }
+    return afterFee
+  }
 }

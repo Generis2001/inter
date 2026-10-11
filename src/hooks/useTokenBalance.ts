@@ -35,7 +35,9 @@ export function useTokenBalance(
   })
 
   const amount = data !== undefined ? Amount.fromRaw(data, token.decimals) : undefined
-  const formatted = amount ? amount.toFixed(2) : '0.00'
+  const formatted = amount
+    ? (amount.raw > 0n && amount.raw < 10_000n ? amount.toFixed(4) : amount.toFixed(2))
+    : '0.00'
 
   return { raw: data, formatted, amount, isLoading, isError, refetch: () => { void refetch() } }
 }
