@@ -11,12 +11,13 @@ import type { ArcTransaction } from '../../hooks/useArcTransactions'
 
 const ARC_MAINNET_ID = 5042
 
-type Filter = 'all' | 'sent' | 'received' | 'contracts' | 'pending' | 'failed'
+type Filter = 'all' | 'sent' | 'received' | 'swaps' | 'pending' | 'failed'
 
 function TxItem({ tx }: { tx: ArcTransaction }) {
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
   const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
+  const isSwap = tx.txType === 'swap'
   const symbol = (tx.tokenSymbol === 'EURC' ? 'EURC' : 'USDC')
 
   const title = isContract
@@ -70,14 +71,21 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
               <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
                 {title}
               </p>
-              {isContract && (
+              {isSwap ? (
+                <span
+                  className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0"
+                  style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
+                >
+                  Swap
+                </span>
+              ) : isContract ? (
                 <span
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0"
                   style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
                 >
                   Contract
                 </span>
-              )}
+              ) : null}
             </div>
             <p className="mono mt-0.5 truncate text-xs" style={{ color: 'var(--subtle)' }}>
               {subtitle}
@@ -147,7 +155,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'sent', label: 'Sent' },
   { key: 'received', label: 'Received' },
-  { key: 'contracts', label: 'Contracts' },
+  { key: 'swaps', label: 'Swaps' },
   { key: 'pending', label: 'Pending' },
   { key: 'failed', label: 'Failed' },
 ]
@@ -165,7 +173,7 @@ export function ActivityScreen({ transactions }: ActivityScreenProps) {
     if (filter === 'all') return true
     if (filter === 'sent') return tx.direction === 'sent'
     if (filter === 'received') return tx.direction === 'received'
-    if (filter === 'contracts') return tx.direction === 'contract'
+    if (filter === 'swaps') return tx.txType === 'swap'
     if (filter === 'pending') return tx.status === 'pending'
     if (filter === 'failed') return tx.status === 'failed'
     return true
