@@ -59,7 +59,11 @@ export function isValidMnemonic(phrase: string): boolean {
 
 /** Store session address in sessionStorage (no keys stored) */
 export function persistSession(address: `0x${string}`): void {
-  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ address }))
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ address }))
+  } catch {
+    // sessionStorage might be restricted in some extension contexts or iframes
+  }
 }
 
 /** Load session from sessionStorage */
@@ -75,12 +79,16 @@ export function loadSession(): WalletSession | null {
 
 /** Clear session (lock wallet) */
 export function clearSession(): void {
-  sessionStorage.removeItem(SESSION_KEY)
+  try {
+    sessionStorage.removeItem(SESSION_KEY)
+  } catch {}
 }
 
 /** Format an address for display */
-export function formatAddress(addr: string): string {
-  if (!addr || addr.length < 10) return addr
+export function formatAddress(addr: string | null | undefined): string {
+  if (!addr || typeof addr !== 'string' || addr.length < 10) {
+    return typeof addr === 'string' ? addr : ''
+  }
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`
 }
 

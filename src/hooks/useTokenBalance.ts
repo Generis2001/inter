@@ -2,7 +2,7 @@
  * Generic ERC-20 balance hook for any token on Arc Mainnet.
  * Used for both USDC and EURC.
  */
-import { useReadContract, useBlockNumber } from 'wagmi'
+import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { Amount } from '@/onchain-money'
 import { ARC_MAINNET_ID, type TokenInfo } from '../utils/tokens'
@@ -20,8 +20,6 @@ export function useTokenBalance(
   token: TokenInfo,
   address: `0x${string}` | undefined,
 ): TokenBalance {
-  const { data: _block } = useBlockNumber({ chainId: ARC_MAINNET_ID, watch: true })
-
   const { data, isLoading, isError, refetch } = useReadContract({
     address: token.address,
     abi: erc20Abi,
@@ -34,10 +32,28 @@ export function useTokenBalance(
     },
   })
 
-  const amount = data !== undefined ? Amount.fromRaw(data, token.decimals) : undefined
+  // Safely parse data to Amount — never throw on null, undefined, or unexpected shapes
+  let amount: Amount | undefined
+  try {
+    if (typeof data === 'bigint') {
+      amount = Amount.fromRaw(data, token.decimals)
+    } else if (data !== undefined && data !== null && typeof data === 'string' && /^\d+$/.test(data)) {
+      amount = Amount.fromRaw(BigInt(data), token.decimals)
+    }
+  } catch {
+    amount = undefined
+  }
+
   const formatted = amount
     ? (amount.raw > 0n && amount.raw < 10_000n ? amount.toFixed(4) : amount.toFixed(2))
     : '0.00'
 
-  return { raw: data, formatted, amount, isLoading, isError, refetch: () => { void refetch() } }
+  return {
+    raw: typeof data === 'bigint' ? data : undefined,
+    formatted,
+    amount,
+    isLoading,
+    isError,
+    refetch: () => { void refetch() },
+  }
 }

@@ -2,7 +2,7 @@
  * Read USDC balance from Arc Mainnet ERC-20 (6 decimals).
  * On Arc, native and USDC ERC-20 are ONE pool — we show ONLY the ERC-20 view.
  */
-import { useReadContract, useBlockNumber } from 'wagmi'
+import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { getUsdc, requireChain } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
@@ -20,9 +20,6 @@ export interface ArcBalance {
 }
 
 export function useArcBalance(address: `0x${string}` | undefined): ArcBalance {
-  // Watch block number to auto-refetch on new blocks
-  const { data: _block } = useBlockNumber({ chainId: ARC_MAINNET_ID, watch: true })
-
   const { data, isLoading, isError, refetch } = useReadContract({
     address: usdcFact.address as `0x${string}`,
     abi: erc20Abi,
@@ -31,14 +28,31 @@ export function useArcBalance(address: `0x${string}` | undefined): ArcBalance {
     chainId: ARC_MAINNET_ID,
     query: {
       enabled: !!address,
-      refetchInterval: 15_000, // fallback poll every 15s
+      refetchInterval: 15_000,
     },
   })
 
-  const amount = data !== undefined ? Amount.fromRaw(data, usdcFact.decimals) : undefined
+  let amount: Amount | undefined
+  try {
+    if (typeof data === 'bigint') {
+      amount = Amount.fromRaw(data, usdcFact.decimals)
+    } else if (data !== undefined && data !== null && typeof data === 'string' && /^\d+$/.test(data)) {
+      amount = Amount.fromRaw(BigInt(data), usdcFact.decimals)
+    }
+  } catch {
+    amount = undefined
+  }
+
   const formatted = amount ? amount.toFixed(2) : '0.00'
 
-  return { raw: data, formatted, amount, isLoading, isError, refetch: () => { void refetch() } }
+  return {
+    raw: typeof data === 'bigint' ? data : undefined,
+    formatted,
+    amount,
+    isLoading,
+    isError,
+    refetch: () => { void refetch() },
+  }
 }
 
 export function useArcChain() {

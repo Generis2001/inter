@@ -9,7 +9,6 @@ import { Amount } from '@/onchain-money'
 import { TOKENS, TOKEN_BY_ADDRESS } from '../utils/tokens'
 
 const ARC_MAINNET_ID = 5042
-const USDC_DECIMALS = 6
 
 // All tracked token addresses (lowercase)
 const TRACKED_ADDRESSES = new Set(TOKENS.map((t) => t.address.toLowerCase()))
@@ -103,6 +102,18 @@ export function sanitizeTxValue(valStr: string, rawVal?: bigint): string {
   return valStr || '0.00'
 }
 
+function safeBigInt(v: unknown): bigint | undefined {
+  if (typeof v === 'bigint') return v
+  if (typeof v === 'number' && !isNaN(v)) return BigInt(Math.floor(v))
+  if (typeof v === 'string' && /^-?\d+$/.test(v.trim())) {
+    try { return BigInt(v.trim()) } catch { return undefined }
+  }
+  if (typeof v === 'string' && /^0x[0-9a-fA-F]+$/.test(v.trim())) {
+    try { return BigInt(v.trim()) } catch { return undefined }
+  }
+  return undefined
+}
+
 export function recordTransaction(tx: ArcTransaction) {
   try {
     const sanitizedTx: ArcTransaction = {
@@ -115,9 +126,16 @@ export function recordTransaction(tx: ArcTransaction) {
     const globalKey = 'inter_tx_history_all'
 
     const saveToKey = (key: string) => {
-      const existing: ArcTransaction[] = JSON.parse(localStorage.getItem(key) || '[]')
-      const updated = [sanitizedTx, ...existing.filter((item) => item.hash.toLowerCase() !== sanitizedTx.hash.toLowerCase())].slice(0, 50)
-      localStorage.setItem(key, JSON.stringify(updated))
+      const stored = localStorage.getItem(key)
+      let existing: ArcTransaction[] = []
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed)) existing = parsed
+        } catch {}
+      }
+      const updated = [sanitizedTx, ...existing.filter((item) => item.hash?.toLowerCase() !== sanitizedTx.hash?.toLowerCase())].slice(0, 50)
+      localStorage.setItem(key, JSON.stringify(updated, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)))
     }
 
     if (fromKey) saveToKey(fromKey)
@@ -157,7 +175,7 @@ export function getRecordedTransactions(address: string | undefined): ArcTransac
             for (const item of list) {
               if (item && item.hash) {
                 // Sanitize any existing item that was saved with 10^12 extra scaling
-                item.value = sanitizeTxValue(item.value, item.rawValue ? BigInt(item.rawValue) : undefined)
+                item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
 
                 // If address is specified, check if it matches from or to, or if from global store
                 if (!addr || item.from?.toLowerCase() === addr || item.to?.toLowerCase() === addr || key === `inter_tx_history_${addr}`) {
@@ -184,7 +202,7 @@ export function getRecordedTransactions(address: string | undefined): ArcTransac
           if (Array.isArray(list)) {
             for (const item of list) {
               if (item && item.hash) {
-                item.value = sanitizeTxValue(item.value, item.rawValue ? BigInt(item.rawValue) : undefined)
+                item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
                 txMap.set(item.hash.toLowerCase(), item)
               }
             }
@@ -208,6 +226,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
   // Sync state whenever address becomes available or changes
   useEffect(() => {
     const local = getRecordedTransactions(address)
+    /* oxlint-disable-next-line react/set-state-in-effect */
     setTransactions(local)
   }, [address])
 

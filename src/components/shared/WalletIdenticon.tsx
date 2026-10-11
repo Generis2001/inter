@@ -28,7 +28,8 @@ const PALETTES = [
 
 // ---- Hash utility -----------------------------------------------------------
 // Simple deterministic hash from address string → array of bytes (0–255)
-function hashAddress(addr: string): number[] {
+function hashAddress(addr: string | null | undefined): number[] {
+  if (!addr || typeof addr !== 'string') return new Array(20).fill(42)
   const norm = addr.toLowerCase().replace(/^0x/, '')
   const bytes: number[] = []
   for (let i = 0; i < norm.length; i += 2) {
@@ -111,7 +112,8 @@ const shapes: ShapeDrawer[] = [
 // ---- Component --------------------------------------------------------------
 
 export function WalletIdenticon({ address, size = 32, className = '' }: WalletIdenticonProps) {
-  const bytes = hashAddress(address)
+  const safeAddress = typeof address === 'string' && address.length > 0 ? address : '0x0000000000000000000000000000000000000000'
+  const bytes = hashAddress(safeAddress)
   const vb = 80 // viewBox size
 
   // Pick palette

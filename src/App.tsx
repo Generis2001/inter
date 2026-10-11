@@ -20,6 +20,7 @@ import { useNotifications } from './hooks/useNotifications'
 import { useArcNSPrimaryName } from './hooks/useArcNSPrimaryName'
 import { InterLogo } from './components/shared/InterLogo'
 import { WalletIdenticon } from './components/shared/WalletIdenticon'
+import { ErrorBoundary } from './components/shared/ErrorBoundary'
 import { Bell, PanelRight } from 'lucide-react'
 
 // Inner component so it can access WalletContext
@@ -167,7 +168,7 @@ function WalletApp() {
 
       {/* Page content — offset for fixed header */}
       <div className="pt-14">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" initial={false}>
           {activeTab === 'home' && (
             <motion.div
               key="home"
@@ -176,13 +177,15 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <DashboardScreen
-                onNavigate={handleNavigate}
-                onShowSend={() => setSendOpen(true)}
-                onShowReceive={() => setReceiveOpen(true)}
-                transactions={transactions}
-                isLoading={txLoading}
-              />
+              <ErrorBoundary fallbackTitle="Dashboard Error">
+                <DashboardScreen
+                  onNavigate={handleNavigate}
+                  onShowSend={() => setSendOpen(true)}
+                  onShowReceive={() => setReceiveOpen(true)}
+                  transactions={transactions}
+                  isLoading={txLoading}
+                />
+              </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'activity' && (
@@ -193,11 +196,13 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <ActivityScreen
-                transactions={transactions}
-                isLoading={txLoading}
-                isError={txError}
-              />
+              <ErrorBoundary fallbackTitle="Activity Error">
+                <ActivityScreen
+                  transactions={transactions}
+                  isLoading={txLoading}
+                  isError={txError}
+                />
+              </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'assets' && (
@@ -208,7 +213,9 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <AssetsScreen />
+              <ErrorBoundary fallbackTitle="Assets Error">
+                <AssetsScreen />
+              </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'swap' && (
@@ -219,7 +226,9 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <SwapScreen />
+              <ErrorBoundary fallbackTitle="Swap Error">
+                <SwapScreen />
+              </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'ans' && (
@@ -230,7 +239,9 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <AnsScreen />
+              <ErrorBoundary fallbackTitle="ArcNS Error">
+                <AnsScreen />
+              </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'settings' && (
@@ -241,7 +252,9 @@ function WalletApp() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
             >
-              <SettingsScreen />
+              <ErrorBoundary fallbackTitle="Settings Error">
+                <SettingsScreen />
+              </ErrorBoundary>
             </motion.div>
           )}
         </AnimatePresence>
@@ -250,16 +263,22 @@ function WalletApp() {
       <BottomNav active={activeTab} onChange={setActiveTab} />
 
       {/* Sheets */}
-      <SendSheet open={sendOpen} onClose={() => setSendOpen(false)} />
-      <ReceiveSheet open={receiveOpen} onClose={() => setReceiveOpen(false)} />
+      <ErrorBoundary fallbackTitle="Send Sheet Error">
+        <SendSheet open={sendOpen} onClose={() => setSendOpen(false)} />
+      </ErrorBoundary>
+      <ErrorBoundary fallbackTitle="Receive Sheet Error">
+        <ReceiveSheet open={receiveOpen} onClose={() => setReceiveOpen(false)} />
+      </ErrorBoundary>
     </div>
   )
 }
 
 export default function App() {
   return (
-    <WalletProvider>
-      <WalletApp />
-    </WalletProvider>
+    <ErrorBoundary fallbackTitle="Inter Wallet Encountered an Issue">
+      <WalletProvider>
+        <WalletApp />
+      </WalletProvider>
+    </ErrorBoundary>
   )
 }

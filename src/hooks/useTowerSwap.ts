@@ -294,7 +294,6 @@ export function useTowerSwap(slippageBps = 50) {
       }
 
       // Step 2: Swap
-      let broadcastHash: string | undefined = undefined
       setSwapState({ status: 'swapping' })
       const txHash = await walletClient.sendTransaction({
         account: viemAcct,
@@ -302,7 +301,6 @@ export function useTowerSwap(slippageBps = 50) {
         data: txData.swap.data as `0x${string}`,
         value: BigInt(txData.swap.value ?? '0'),
       })
-      broadcastHash = txHash
 
       // Record immediately as pending
       recordTransaction({

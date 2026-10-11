@@ -68,11 +68,14 @@ export function SwapScreen() {
   const [customSlippage, setCustomSlippage] = useState('')
 
   // Sync custom input when preset changes
+  /* oxlint-disable-next-line react/set-state-in-effect */
   useEffect(() => {
     const pct = slippageBps / 100
     if (!SLIPPAGE_PRESETS.includes(pct)) {
+      /* oxlint-disable-next-line react/set-state-in-effect */
       setCustomSlippage(pct.toString())
     } else {
+      /* oxlint-disable-next-line react/set-state-in-effect */
       setCustomSlippage('')
     }
   }, [slippageBps])

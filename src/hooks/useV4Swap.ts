@@ -393,7 +393,7 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
 
       setSwapState({ status: 'error', message: clean })
     }
-  }, [account, amountIn, tokenIn, tokenOut])
+  }, [account, amountIn, tokenIn, tokenOut, slippageBps])
 
   const reset = useCallback(() => {
     setAmountIn('')

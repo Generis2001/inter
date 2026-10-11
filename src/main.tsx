@@ -21,6 +21,7 @@ import { ConnectKitProvider } from 'connectkit'
 import { Toaster } from 'sonner'
 import { config } from './config'
 import App from './App'
+import { ErrorBoundary } from './components/shared/ErrorBoundary'
 import './index.css'
 
 const queryClient = new QueryClient()
@@ -36,14 +37,16 @@ if (typeof window !== 'undefined') {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <ConnectKitProvider>
-          <App />
-          <Toaster position="top-center" />
-        </ConnectKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <ErrorBoundary fallbackTitle="Inter Wallet Startup Error">
+      <WagmiProvider config={config}>
+        <QueryClientProvider client={queryClient}>
+          <ConnectKitProvider>
+            <App />
+            <Toaster position="top-center" />
+          </ConnectKitProvider>
+        </QueryClientProvider>
+      </WagmiProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )
 
