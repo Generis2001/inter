@@ -71,8 +71,8 @@ const ACTION_TAKE_ALL             = 0x0f
 const POOL_FEE     = 500
 const TICK_SPACING  = 10
 
-// Slippage: 0.5% = 50 bps
-const SLIPPAGE_BPS = 50
+// Slippage default: 0.5% = 50 bps (overridden by parameter)
+const DEFAULT_SLIPPAGE_BPS = 50
 
 // Permit2 approval expiration: 30 days from now
 const PERMIT2_EXPIRY_SECONDS = 30 * 24 * 60 * 60
@@ -195,7 +195,7 @@ function encodeV4SwapInput(p: {
   )
 }
 
-export function useV4Swap() {
+export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
   const { account } = useWallet()
   const [tokenIn, setTokenIn]     = useState<TokenInfo>(TOKENS[0])  // USDC
   const [tokenOut, setTokenOut]   = useState<TokenInfo>(TOKENS[1])  // EURC
@@ -293,7 +293,7 @@ export function useV4Swap() {
       try { quotedOut = await quoteExactIn(parsed, tokenIn, tokenOut) }
       catch { quotedOut = parsed }
 
-      const minAmountOut = quotedOut - (quotedOut * BigInt(SLIPPAGE_BPS)) / 10_000n
+      const minAmountOut = quotedOut - (quotedOut * BigInt(slippageBps)) / 10_000n
 
       setSwapState({ status: 'swapping' })
 

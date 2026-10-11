@@ -25,7 +25,6 @@ import { Amount } from '@/onchain-money'
 import { recordTransaction } from './useArcTransactions'
 
 const TOWER_BASE = 'https://www.tower.exchange/api/public'
-const SLIPPAGE_BPS = 50   // 0.5%
 const ARC_CHAIN_ID = 5042
 
 const ERC20_ABI = parseAbi([
@@ -116,6 +115,7 @@ async function towerQuote(
   tokenIn: TokenInfo,
   tokenOut: TokenInfo,
   amountIn: bigint,
+  slippageBps: number,
 ): Promise<TowerQuoteResponse['data']> {
   const key = getApiKey()
   const res = await fetch(`${TOWER_BASE}/swap/quote`, {
@@ -128,7 +128,7 @@ async function towerQuote(
       inputToken:       tokenIn.symbol,   // Tower uses symbols (USDC/EURC), not hex addresses
       outputToken:      tokenOut.symbol,
       inputAmount:      amountIn.toString(),
-      slippageTolerance: SLIPPAGE_BPS,
+      slippageTolerance: slippageBps,
       chainId:          ARC_CHAIN_ID,
     }),
   })
@@ -169,7 +169,7 @@ function parseAmountSafe(str: string, decimals: number): bigint | null {
 
 // ---- hook -------------------------------------------------------------------
 
-export function useTowerSwap() {
+export function useTowerSwap(slippageBps = 50) {
   const { account } = useWallet()
   const [tokenIn, setTokenIn]     = useState<TokenInfo>(TOKENS[0])  // USDC
   const [tokenOut, setTokenOut]   = useState<TokenInfo>(TOKENS[1])  // EURC
@@ -195,7 +195,7 @@ export function useTowerSwap() {
         return
       }
       setSwapState({ status: 'quoting' })
-      void towerQuote(tokenIn, tokenOut, parsed)
+      void towerQuote(tokenIn, tokenOut, parsed, slippageBps)
         .then((quote) => {
           setSwapState({
             status: 'quoted',
@@ -214,7 +214,7 @@ export function useTowerSwap() {
     return () => {
       if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
     }
-  }, [amountIn, tokenIn, tokenOut])
+  }, [amountIn, tokenIn, tokenOut, slippageBps])
 
   const executeSwap = useCallback(async () => {
     if (!account) return

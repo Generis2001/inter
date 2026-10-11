@@ -4,6 +4,8 @@
  * Tower Exchange (primary) and Uniswap v4 Universal Router (secondary).
  * Delegates all logic to the active hook; exposes a `route` toggle so the
  * UI can switch between them without losing the entered amount.
+ *
+ * Now includes a unified slippage control (in BPS) that both hooks consume.
  */
 import { useState, useCallback } from 'react'
 import { useTowerSwap } from './useTowerSwap'
@@ -13,9 +15,10 @@ export type SwapRoute = 'tower' | 'uniswap-v4'
 
 export function useSwap() {
   const [route, setRoute] = useState<SwapRoute>('tower')
+  const [slippageBps, setSlippageBps] = useState(50) // 0.5% default
 
-  const tower  = useTowerSwap()
-  const uniV4  = useV4Swap()
+  const tower  = useTowerSwap(slippageBps)
+  const uniV4  = useV4Swap(slippageBps)
 
   const active = route === 'tower' ? tower : uniV4
 
@@ -50,5 +53,7 @@ export function useSwap() {
     swapState,
     executeSwap: active.executeSwap,
     reset:       active.reset,
+    slippageBps,
+    setSlippageBps,
   }
 }

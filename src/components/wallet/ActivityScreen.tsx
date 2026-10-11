@@ -3,6 +3,7 @@ import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
 import { Skeleton } from '../shared/Skeleton'
 import { TokenIcon } from '../shared/TokenLogo'
+import { TowerLogo } from '../shared/TowerLogo'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { ArrowUpRight, ArrowDownLeft, FileCode, ExternalLink } from 'lucide-react'
@@ -15,6 +16,7 @@ type Filter = 'all' | 'sent' | 'received' | 'contracts' | 'pending' | 'failed'
 function TxItem({ tx }: { tx: ArcTransaction }) {
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
+  const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
   const symbol = (tx.tokenSymbol === 'EURC' ? 'EURC' : 'USDC')
 
   const title = isContract
@@ -46,6 +48,8 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
         >
           {tx.status === 'failed' ? (
             <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
+          ) : isContract && isTower ? (
+            <TowerLogo size={16} />
           ) : isContract ? (
             <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
           ) : isSent ? (

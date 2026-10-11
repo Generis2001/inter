@@ -19,6 +19,7 @@ import { useArcTransactions } from './hooks/useArcTransactions'
 import { useNotifications } from './hooks/useNotifications'
 import { useArcNSPrimaryName } from './hooks/useArcNSPrimaryName'
 import { InterLogo } from './components/shared/InterLogo'
+import { WalletIdenticon } from './components/shared/WalletIdenticon'
 import { Bell } from 'lucide-react'
 
 // Inner component so it can access WalletContext
@@ -114,17 +115,22 @@ function WalletApp() {
             )}
           </button>
 
-          {/* Wallet avatar — shows ANS name if set, else address initials */}
+          {/* Wallet avatar — deterministic identicon from address */}
           <button
             onClick={() => setActiveTab('settings')}
-            className="flex h-8 min-w-[32px] items-center justify-center rounded-2xl px-2 text-xs font-bold text-white transition-all hover:scale-[1.03]"
-            style={{ background: 'var(--accent-gradient)' }}
+            className="flex items-center justify-center rounded-2xl transition-all hover:scale-[1.03] active:scale-[0.97]"
             title={primaryName ?? address ?? ''}
           >
-            {primaryName
-              ? primaryName.replace(/\.(arc|circle)$/, '').slice(0, 8)
-              : address ? address.slice(2, 4).toUpperCase() : 'IW'
-            }
+            {address ? (
+              <WalletIdenticon address={address} size={32} />
+            ) : (
+              <div
+                className="flex h-8 min-w-[32px] items-center justify-center rounded-2xl px-2 text-xs font-bold text-white"
+                style={{ background: 'var(--accent-gradient)' }}
+              >
+                IW
+              </div>
+            )}
           </button>
         </div>
       </header>

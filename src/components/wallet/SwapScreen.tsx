@@ -1,13 +1,15 @@
 /**
  * SwapScreen — USDC <-> EURC swap.
  * Tower Exchange (primary) or Uniswap v4 Universal Router (secondary).
+ * Features: adjustable slippage, Tower logo branding, route details.
  */
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSwap, type SwapRoute } from '../../hooks/useSwap'
 import { useTokenBalance } from '../../hooks/useTokenBalance'
 import { useWallet } from '../../context/WalletContext'
 import { TokenIcon } from '../shared/TokenLogo'
+import { TowerLogo } from '../shared/TowerLogo'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import {
   ArrowUpDown,
@@ -16,14 +18,16 @@ import {
   AlertTriangle,
   ExternalLink,
   ChevronRight,
-  Zap,
+  Settings2,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const ARC_MAINNET_ID = 5042
 
+const SLIPPAGE_PRESETS = [0.1, 0.3, 0.5, 1.0]
+
 const ROUTE_LABELS: Record<SwapRoute, string> = {
-  'tower':      'Tower',
+  'tower':      'Tower Exchange',
   'uniswap-v4': 'Uniswap v4',
 }
 
@@ -40,11 +44,27 @@ export function SwapScreen() {
     swapState,
     executeSwap,
     reset,
+    slippageBps,
+    setSlippageBps,
   } = useSwap()
 
   const queryClient = useQueryClient()
   const { formatted: balanceIn, isLoading: balIn, refetch: refetchIn } = useTokenBalance(tokenIn, account?.address)
   const { formatted: balanceOut, refetch: refetchOut } = useTokenBalance(tokenOut, account?.address)
+
+  // Slippage settings panel state
+  const [showSlippage, setShowSlippage] = useState(false)
+  const [customSlippage, setCustomSlippage] = useState('')
+
+  // Sync custom input when preset changes
+  useEffect(() => {
+    const pct = slippageBps / 100
+    if (!SLIPPAGE_PRESETS.includes(pct)) {
+      setCustomSlippage(pct.toString())
+    } else {
+      setCustomSlippage('')
+    }
+  }, [slippageBps])
 
   // Invalidate and refresh all balance queries across the wallet immediately on swap completion
   useEffect(() => {
@@ -82,9 +102,36 @@ export function SwapScreen() {
     if (balanceIn) setAmountIn(balanceIn.replace(/[^0-9.]/g, ''))
   }
 
+  const handleSlippagePreset = (pct: number) => {
+    setSlippageBps(Math.round(pct * 100))
+    setCustomSlippage('')
+  }
+
+  const handleCustomSlippage = (val: string) => {
+    const clean = val.replace(/[^0-9.]/g, '')
+    setCustomSlippage(clean)
+    const parsed = parseFloat(clean)
+    if (!isNaN(parsed) && parsed > 0 && parsed <= 50) {
+      setSlippageBps(Math.round(parsed * 100))
+    }
+  }
+
+  // Route label with Tower logo inline
+  const routeDisplay = (routeKey: SwapRoute, dexNameOverride?: string) => {
+    const label = dexNameOverride ?? ROUTE_LABELS[routeKey]
+    const isTower = routeKey === 'tower' || label.toLowerCase().includes('tower')
+    return (
+      <span className="flex items-center gap-1.5">
+        {isTower ? <TowerLogo size={16} /> : null}
+        {label}
+      </span>
+    )
+  }
+
   // ---- success state ---------------------------------------------------------
   if (isSuccess && swapState.status === 'success') {
     const dexName = 'dexName' in swapState ? (swapState as { dexName: string }).dexName : ROUTE_LABELS[route]
+    const isTowerRoute = route === 'tower' || dexName.toLowerCase().includes('tower')
     return (
       <div className="flex min-h-[calc(100dvh-120px)] flex-col items-center justify-center px-4 pb-28 pt-6 text-center">
         <motion.div
@@ -105,8 +152,8 @@ export function SwapScreen() {
           {swapState.amountOut.toFixed(4)}{' '}
           <span style={{ color: 'var(--accent)' }}>{tokenOut.symbol}</span>
         </p>
-        <p className="mb-5 flex items-center justify-center gap-1 text-xs" style={{ color: 'var(--subtle)' }}>
-          <Zap className="size-3" />
+        <p className="mb-5 flex items-center justify-center gap-1.5 text-xs" style={{ color: 'var(--subtle)' }}>
+          {isTowerRoute && <TowerLogo size={14} />}
           via {dexName}
         </p>
         <a
@@ -150,31 +197,127 @@ export function SwapScreen() {
           </p>
         </div>
 
-        {/* Route selector */}
-        <div
-          className="flex items-center gap-0.5 rounded-xl p-1"
-          style={{
-            background: 'rgba(18,45,69,0.06)',
-            border: '1px solid rgba(18,45,69,0.08)',
-          }}
-        >
-          {(['tower', 'uniswap-v4'] as SwapRoute[]).map((r) => (
-            <button
-              key={r}
-              onClick={() => { if (!busy) switchRoute(r) }}
-              disabled={busy}
-              className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-40"
-              style={
-                route === r
-                  ? { background: 'var(--accent)', color: '#fff' }
-                  : { color: 'var(--muted)' }
-              }
-            >
-              {ROUTE_LABELS[r]}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          {/* Slippage gear button */}
+          <button
+            onClick={() => setShowSlippage((v) => !v)}
+            className="flex items-center justify-center rounded-xl p-2 transition-all hover:bg-black/5"
+            style={{ color: showSlippage ? 'var(--accent)' : 'var(--muted)' }}
+            title="Slippage settings"
+          >
+            <Settings2 className="size-4.5" />
+          </button>
+
+          {/* Route selector */}
+          <div
+            className="flex items-center gap-0.5 rounded-xl p-1"
+            style={{
+              background: 'rgba(18,45,69,0.06)',
+              border: '1px solid rgba(18,45,69,0.08)',
+            }}
+          >
+            {(['tower', 'uniswap-v4'] as SwapRoute[]).map((r) => (
+              <button
+                key={r}
+                onClick={() => { if (!busy) switchRoute(r) }}
+                disabled={busy}
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-40"
+                style={
+                  route === r
+                    ? { background: 'var(--accent)', color: '#fff' }
+                    : { color: 'var(--muted)' }
+                }
+              >
+                {r === 'tower' && <TowerLogo size={12} className={route === r ? '' : 'opacity-60'} />}
+                {r === 'tower' ? 'Tower' : 'Uni v4'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Slippage settings panel */}
+      <AnimatePresence>
+        {showSlippage && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            className="overflow-hidden"
+          >
+            <div
+              className="rounded-2xl p-4"
+              style={{
+                background: 'rgba(255,255,255,0.80)',
+                border: '1px solid rgba(6,182,212,0.14)',
+                boxShadow: '0 2px 12px rgba(6,182,212,0.06)',
+              }}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                  Max Slippage
+                </span>
+                <span className="text-xs font-bold" style={{ color: 'var(--accent)' }}>
+                  {(slippageBps / 100).toFixed(slippageBps % 100 === 0 ? 1 : 2)}%
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {SLIPPAGE_PRESETS.map((pct) => (
+                  <button
+                    key={pct}
+                    onClick={() => handleSlippagePreset(pct)}
+                    className="flex-1 rounded-xl py-2 text-xs font-semibold transition-all"
+                    style={
+                      slippageBps === Math.round(pct * 100) && customSlippage === ''
+                        ? { background: 'var(--accent)', color: '#fff' }
+                        : {
+                            background: 'rgba(18,45,69,0.06)',
+                            color: 'var(--muted)',
+                          }
+                    }
+                  >
+                    {pct}%
+                  </button>
+                ))}
+                {/* Custom input */}
+                <div
+                  className="relative flex flex-1 items-center rounded-xl"
+                  style={{
+                    background: customSlippage ? 'rgba(6,182,212,0.08)' : 'rgba(18,45,69,0.06)',
+                    border: customSlippage ? '1px solid rgba(6,182,212,0.20)' : '1px solid transparent',
+                  }}
+                >
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Custom"
+                    value={customSlippage}
+                    onChange={(e) => handleCustomSlippage(e.target.value)}
+                    className="w-full bg-transparent px-2.5 py-2 text-center text-xs font-semibold outline-none placeholder:text-slate-400"
+                    style={{ color: 'var(--ink)' }}
+                  />
+                  {customSlippage && (
+                    <span className="absolute right-2 text-xs" style={{ color: 'var(--subtle)' }}>%</span>
+                  )}
+                </div>
+              </div>
+              {/* Warning for high slippage */}
+              {slippageBps > 300 && (
+                <p className="mt-2 flex items-center gap-1 text-[11px]" style={{ color: 'var(--danger)' }}>
+                  <AlertTriangle className="size-3" />
+                  High slippage — your trade may execute at a significantly different price
+                </p>
+              )}
+              {slippageBps < 10 && (
+                <p className="mt-2 flex items-center gap-1 text-[11px]" style={{ color: '#d4a017' }}>
+                  <AlertTriangle className="size-3" />
+                  Very low slippage — your transaction may fail
+                </p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Swap card */}
       <div
@@ -297,13 +440,11 @@ export function SwapScreen() {
                     {([
                       {
                         label: 'Route',
-                        value: (
-                          <span className="flex items-center gap-1">
-                            <Zap className="size-3" style={{ color: 'var(--accent)' }} />
-                            {'dexName' in swapState
-                              ? (swapState as { dexName: string }).dexName
-                              : ROUTE_LABELS[route]}
-                          </span>
+                        value: routeDisplay(
+                          route,
+                          'dexName' in swapState
+                            ? (swapState as { dexName: string }).dexName
+                            : undefined,
                         ),
                       },
                       {
@@ -312,8 +453,11 @@ export function SwapScreen() {
                           ? `${(swapState as { priceImpact: number }).priceImpact.toFixed(3)}%`
                           : '< 0.01%',
                       },
-                      { label: 'Max slippage', value: '0.50%' },
-                      { label: 'Network fee',  value: 'Paid in USDC' },
+                      {
+                        label: 'Max slippage',
+                        value: `${(slippageBps / 100).toFixed(slippageBps % 100 === 0 ? 1 : 2)}%`,
+                      },
+                      { label: 'Network fee', value: 'Paid in USDC' },
                     ] as { label: string; value: React.ReactNode }[]).map(({ label, value }) => (
                       <div key={label} className="flex items-center justify-between py-1">
                         <span className="text-xs" style={{ color: 'var(--subtle)' }}>{label}</span>
@@ -413,7 +557,8 @@ export function SwapScreen() {
       </div>
 
       {/* Footer */}
-      <p className="mt-4 text-center text-xs" style={{ color: 'var(--subtle)' }}>
+      <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-xs" style={{ color: 'var(--subtle)' }}>
+        {route === 'tower' && <TowerLogo size={12} />}
         {route === 'tower'
           ? 'Optimal routing via Tower Exchange across Arc DEXes'
           : 'Direct swap via Uniswap v4 on Arc Mainnet'}

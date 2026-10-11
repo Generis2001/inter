@@ -6,6 +6,7 @@ import { GlassCard } from '../shared/GlassCard'
 import { Skeleton } from '../shared/Skeleton'
 import { NetworkBadge } from '../shared/NetworkBadge'
 import { TokenIcon } from '../shared/TokenLogo'
+import { TowerLogo } from '../shared/TowerLogo'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { TOKENS } from '../../utils/tokens'
@@ -34,6 +35,7 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
   const isFailed = tx.status === 'failed'
+  const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
 
   const title = isContract
     ? (tx.method ?? tx.contractName ?? 'Contract')
@@ -62,6 +64,8 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
       >
         {isFailed ? (
           <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
+        ) : isContract && isTower ? (
+          <TowerLogo size={16} />
         ) : isContract ? (
           <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
         ) : isSent ? (
@@ -164,7 +168,7 @@ export function DashboardScreen({ onNavigate, onShowSend, onShowReceive, transac
       <div className="mx-auto max-w-md px-4 pb-32 pt-5">
         {/* Network + refresh row */}
         <div className="mb-4 flex items-center justify-between">
-          <NetworkBadge isConnected={true} />
+          <NetworkBadge />
           <button
             onClick={() => { void handleRefresh() }}
             className="flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition-all hover:bg-black/5"

@@ -3,6 +3,7 @@ import { useWallet } from '../../context/WalletContext'
 import { useArcBalance } from '../../hooks/useArcBalance'
 import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
+import { WalletIdenticon } from '../shared/WalletIdenticon'
 import { formatAddress } from '../../utils/wallet'
 import { buildAddressExplorerUrl, requireChain } from '@/onchain-facts'
 import {
@@ -55,12 +56,16 @@ export function SettingsScreen() {
         {/* Wallet info */}
         <GlassCard className="mb-4">
           <div className="flex items-center gap-3 px-4 py-4">
-            <div
-              className="flex size-12 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white"
-              style={{ background: 'var(--accent)' }}
-            >
-              {address ? address.slice(2, 4).toUpperCase() : 'IN'}
-            </div>
+            {address ? (
+              <WalletIdenticon address={address} size={48} />
+            ) : (
+              <div
+                className="flex size-12 shrink-0 items-center justify-center rounded-2xl text-lg font-bold text-white"
+                style={{ background: 'var(--accent)' }}
+              >
+                IN
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
                 My Wallet
