@@ -7,7 +7,7 @@ import { TowerLogo } from '../shared/TowerLogo'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { ArrowUpRight, ArrowDownLeft, FileCode, ExternalLink } from 'lucide-react'
-import type { ArcTransaction } from '../../hooks/useArcTransactions'
+import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
 
 const ARC_MAINNET_ID = 5042
 
@@ -19,6 +19,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
   const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
   const isSwap = tx.txType === 'swap'
   const symbol = (tx.tokenSymbol === 'EURC' ? 'EURC' : 'USDC')
+  const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
 
   const title = isContract
     ? (tx.method ?? tx.contractName ?? 'Contract Interaction')
@@ -104,8 +105,8 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
               }}
             >
               {isContract
-                ? (tx.value !== '0.00' ? `${tx.value} ${tx.tokenSymbol}` : 'Call')
-                : `${isSent ? '-' : '+'}${tx.value} ${tx.tokenSymbol}`}
+                ? (displayVal !== '0.00' ? `${displayVal} ${tx.tokenSymbol}` : 'Call')
+                : `${isSent ? '-' : '+'}${displayVal} ${tx.tokenSymbol}`}
             </p>
           </div>
         </div>

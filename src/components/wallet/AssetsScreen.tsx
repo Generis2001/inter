@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useWallet } from '../../context/WalletContext'
 import { useTokenBalance } from '../../hooks/useTokenBalance'
-import { useArcTransactions } from '../../hooks/useArcTransactions'
+import { useArcTransactions, sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
 import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
 import { Skeleton } from '../shared/Skeleton'
@@ -12,7 +12,6 @@ import { TOKENS, type TokenInfo } from '../../utils/tokens'
 import { ArrowUpRight, ArrowDownLeft, Copy, Check, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-import type { ArcTransaction } from '../../hooks/useArcTransactions'
 
 const ARC_MAINNET_ID = 5042
 
@@ -31,7 +30,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
   const chain = requireChain(ARC_MAINNET_ID)
 
   const assetTxns: ArcTransaction[] = transactions
-    .filter((tx) => tx.tokenSymbol === token.symbol && parseFloat(tx.value) > 0)
+    .filter((tx) => tx.tokenSymbol === token.symbol && parseFloat(sanitizeTxValue(tx.value, tx.rawValue)) > 0)
     .slice(0, 20)
 
   const handleCopyContract = async () => {
@@ -200,7 +199,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
                       className="display text-sm font-bold tabular-nums"
                       style={{ color: tx.status === 'failed' ? 'var(--danger)' : isSent ? 'var(--ink)' : 'var(--success)' }}
                     >
-                      {isSent ? '-' : '+'}{tx.value}
+                      {isSent ? '-' : '+'}{sanitizeTxValue(tx.value, tx.rawValue)}
                     </span>
                   </a>
                 )

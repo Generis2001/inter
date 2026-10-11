@@ -60,15 +60,63 @@ const KNOWN_CONTRACTS: Record<string, { name: string; type: 'swap' | 'approval' 
   '0xeb9898e903126fa400e88029584aac4b14dd8b37': { name: 'EURC Contract', type: 'contract' },
 }
 
+export function formatTransactionValue(
+  rawValue: bigint | string,
+  tokenSymbol: string = 'USDC',
+  tokenAddress?: string,
+  explicitDecimals?: number,
+): string {
+  const raw = typeof rawValue === 'bigint' ? rawValue : BigInt(rawValue || '0')
+  if (raw === 0n) return '0.00'
+
+  const addr = tokenAddress?.toLowerCase() ?? ''
+  const isErc20Usdc = addr === '0x3600000000000000000000000000000000000000'
+  const isErc20Eurc = addr === '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1'
+
+  let decimals = explicitDecimals ?? 6
+  if (!explicitDecimals) {
+    if (addr === '0xfffffffffffffffffffffffffffffffffffffffe' || (!isErc20Usdc && !isErc20Eurc)) {
+      if (raw >= 10_000_000_000_000n) {
+        decimals = 18
+      }
+    } else if (raw >= 100_000_000_000_000n) {
+      // If raw value is >= 10^14 (100M tokens in 6 decimals), it is an 18-decimal system transfer
+      decimals = 18
+    }
+  }
+
+  const amt = Amount.fromRaw(raw, decimals)
+  return amt.raw > 0n && amt.raw < 10n ** BigInt(Math.max(0, decimals - 2)) ? amt.toFixed(4) : amt.toFixed(2)
+}
+
+/** Sanitize formatted value if it was saved with 18-dec / 6-dec mismatch */
+export function sanitizeTxValue(valStr: string, rawVal?: bigint): string {
+  if (rawVal && rawVal >= 100_000_000_000_000n) {
+    return formatTransactionValue(rawVal)
+  }
+  const clean = (valStr || '').replace(/,/g, '')
+  const num = parseFloat(clean)
+  if (!isNaN(num) && num >= 100_000_000) {
+    const fixed = num / 1e12
+    return fixed < 0.01 ? fixed.toFixed(4) : fixed.toFixed(2)
+  }
+  return valStr || '0.00'
+}
+
 export function recordTransaction(tx: ArcTransaction) {
   try {
-    const fromKey = tx.from ? `inter_tx_history_${tx.from.toLowerCase()}` : null
-    const toKey = tx.to ? `inter_tx_history_${tx.to.toLowerCase()}` : null
+    const sanitizedTx: ArcTransaction = {
+      ...tx,
+      value: sanitizeTxValue(tx.value, tx.rawValue),
+    }
+
+    const fromKey = sanitizedTx.from ? `inter_tx_history_${sanitizedTx.from.toLowerCase()}` : null
+    const toKey = sanitizedTx.to ? `inter_tx_history_${sanitizedTx.to.toLowerCase()}` : null
     const globalKey = 'inter_tx_history_all'
 
     const saveToKey = (key: string) => {
       const existing: ArcTransaction[] = JSON.parse(localStorage.getItem(key) || '[]')
-      const updated = [tx, ...existing.filter((item) => item.hash.toLowerCase() !== tx.hash.toLowerCase())].slice(0, 50)
+      const updated = [sanitizedTx, ...existing.filter((item) => item.hash.toLowerCase() !== sanitizedTx.hash.toLowerCase())].slice(0, 50)
       localStorage.setItem(key, JSON.stringify(updated))
     }
 
@@ -76,7 +124,7 @@ export function recordTransaction(tx: ArcTransaction) {
     if (toKey && toKey !== fromKey) saveToKey(toKey)
     saveToKey(globalKey)
 
-    window.dispatchEvent(new CustomEvent('inter_tx_recorded', { detail: tx }))
+    window.dispatchEvent(new CustomEvent('inter_tx_recorded', { detail: sanitizedTx }))
   } catch {
     // local storage unavailable
   }
@@ -108,6 +156,9 @@ export function getRecordedTransactions(address: string | undefined): ArcTransac
           if (Array.isArray(list)) {
             for (const item of list) {
               if (item && item.hash) {
+                // Sanitize any existing item that was saved with 10^12 extra scaling
+                item.value = sanitizeTxValue(item.value, item.rawValue ? BigInt(item.rawValue) : undefined)
+
                 // If address is specified, check if it matches from or to, or if from global store
                 if (!addr || item.from?.toLowerCase() === addr || item.to?.toLowerCase() === addr || key === `inter_tx_history_${addr}`) {
                   const hashKey = item.hash.toLowerCase()
@@ -132,7 +183,10 @@ export function getRecordedTransactions(address: string | undefined): ArcTransac
           const list: ArcTransaction[] = JSON.parse(globalStored)
           if (Array.isArray(list)) {
             for (const item of list) {
-              if (item && item.hash) txMap.set(item.hash.toLowerCase(), item)
+              if (item && item.hash) {
+                item.value = sanitizeTxValue(item.value, item.rawValue ? BigInt(item.rawValue) : undefined)
+                txMap.set(item.hash.toLowerCase(), item)
+              }
             }
           }
         } catch {}
@@ -191,14 +245,16 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
 
           if (trackedTransfer) {
             const tokenInfo = TOKEN_BY_ADDRESS[trackedTransfer.token.address.toLowerCase()]
-            const decimals = tokenInfo?.decimals ?? USDC_DECIMALS
-            rawValue = BigInt(trackedTransfer.total.value)
-            formattedValue = Amount.fromRaw(rawValue, decimals).toFixed(2)
-            tokenSymbol = tokenInfo?.symbol ?? trackedTransfer.token.symbol ?? 'TOKEN'
+            const transferDecimals = trackedTransfer.total.decimals
+              ? parseInt(trackedTransfer.total.decimals, 10)
+              : tokenInfo?.decimals
+            rawValue = BigInt(trackedTransfer.total.value || '0')
+            tokenSymbol = tokenInfo?.symbol ?? trackedTransfer.token.symbol ?? 'USDC'
+            formattedValue = formatTransactionValue(rawValue, tokenSymbol, trackedTransfer.token.address, transferDecimals)
           } else {
             rawValue = BigInt(tx.value || '0')
-            formattedValue = Amount.fromRaw(rawValue / 10n ** 12n, USDC_DECIMALS).toFixed(2)
             tokenSymbol = 'USDC'
+            formattedValue = formatTransactionValue(rawValue, 'USDC', undefined, 18)
           }
 
           const from = tx.from.hash.toLowerCase() as `0x${string}`
@@ -307,7 +363,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
               hash: log.transactionHash,
               from: fromAddr,
               to: toAddr,
-              value: Amount.fromRaw(rawVal, tokenInfo.decimals).toFixed(2),
+              value: formatTransactionValue(rawVal, tokenInfo.symbol, tokenAddr),
               rawValue: rawVal,
               tokenSymbol: tokenInfo.symbol,
               timestamp: Date.now(),

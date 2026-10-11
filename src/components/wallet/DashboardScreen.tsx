@@ -19,8 +19,7 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { motion, AnimatePresence } from 'framer-motion'
-import type { ArcTransaction } from '../../hooks/useArcTransactions'
+import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
 
 const ARC_MAINNET_ID = 5042
 
@@ -39,6 +38,7 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
   const isPending = tx.status === 'pending'
   const isSwap = tx.txType === 'swap' || (tx.contractName ?? '').toLowerCase().includes('tower') || (tx.contractName ?? '').toLowerCase().includes('uniswap')
   const isTower = isSwap && (tx.contractName ?? '').toLowerCase().includes('tower')
+  const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
 
   const title = isSwap
     ? 'Swap'
@@ -135,8 +135,8 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
             style={{ color: isFailed ? 'var(--danger)' : isContract ? 'var(--accent)' : isSent ? 'var(--ink)' : 'var(--success)' }}
           >
             {isContract
-              ? (tx.value !== '0.00' ? `${tx.value} ${tx.tokenSymbol}` : 'Call')
-              : `${isSent ? '-' : '+'}${tx.value}`}
+              ? (displayVal !== '0.00' ? `${displayVal} ${tx.tokenSymbol}` : 'Call')
+              : `${isSent ? '-' : '+'}${displayVal}`}
           </span>
         </div>
         <div className="mt-0.5 flex items-center justify-between">
