@@ -44,11 +44,10 @@ This generates `inter-chrome-extension.zip` in the project root.
 
 ## 2. Android Mobile App (APK)
 
-Inter is equipped with a complete native **Capacitor Android Project (`android/`)** and CI workflow templates in `ci-workflows/`.
+Inter is equipped with a complete native **Capacitor Android Project (`android/`)** and automated GitHub Actions CI workflows in `.github/workflows/`.
 
 ### Method A: Cloud Build via GitHub Actions (Recommended — No Android Studio Needed)
-1. In your GitHub repository, the workflow file is provided in `ci-workflows/build-apk.yml`.
-   - On GitHub.com, go to `.github/workflows/` and add or copy `ci-workflows/build-apk.yml`.
+1. GitHub Actions automatically triggers on push to `main` (or you can trigger it manually).
 2. Go to the **Actions** tab on GitHub:
    - Click on the **Build Android APK** workflow (runs automatically on push, or click **Run workflow**).
    - Once completed (~2-3 minutes), scroll to the **Artifacts** section at the bottom of the run summary.
