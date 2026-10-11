@@ -5,16 +5,25 @@ import { Skeleton } from '../shared/Skeleton'
 import { TokenIcon } from '../shared/TokenLogo'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
-import { ArrowUpRight, ArrowDownLeft, ExternalLink } from 'lucide-react'
+import { ArrowUpRight, ArrowDownLeft, FileCode, ExternalLink } from 'lucide-react'
 import type { ArcTransaction } from '../../hooks/useArcTransactions'
 
 const ARC_MAINNET_ID = 5042
 
-type Filter = 'all' | 'sent' | 'received' | 'pending' | 'failed'
+type Filter = 'all' | 'sent' | 'received' | 'contracts' | 'pending' | 'failed'
 
 function TxItem({ tx }: { tx: ArcTransaction }) {
   const isSent = tx.direction === 'sent'
+  const isContract = tx.direction === 'contract'
   const symbol = (tx.tokenSymbol === 'EURC' ? 'EURC' : 'USDC')
+
+  const title = isContract
+    ? (tx.method ?? tx.contractName ?? 'Contract Interaction')
+    : (isSent ? 'Sent' : 'Received')
+
+  const subtitle = isContract
+    ? (tx.contractName ? `${tx.contractName} · ${tx.to ? formatAddress(tx.to) : 'Contract'}` : (tx.to ? formatAddress(tx.to) : 'Contract'))
+    : (isSent ? (tx.to ? formatAddress(tx.to) : 'Contract') : formatAddress(tx.from))
 
   return (
     <a
@@ -23,18 +32,24 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
       rel="noopener noreferrer"
       className="flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-black/4"
     >
-      {/* Direction icon with token logo overlay */}
+      {/* Direction or Contract icon with token logo overlay */}
       <div className="relative mt-0.5 shrink-0">
         <div
           className="flex size-9 items-center justify-center rounded-xl"
           style={{
             background: tx.status === 'failed'
               ? 'rgba(186,43,76,0.10)'
-              : isSent ? 'rgba(18,45,69,0.08)' : 'rgba(26,128,71,0.10)',
+              : isContract
+                ? 'rgba(6,182,212,0.14)'
+                : isSent ? 'rgba(18,45,69,0.08)' : 'rgba(26,128,71,0.10)',
           }}
         >
-          {isSent ? (
-            <ArrowUpRight className="size-4" style={{ color: tx.status === 'failed' ? 'var(--danger)' : 'var(--ink-2)' }} />
+          {tx.status === 'failed' ? (
+            <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
+          ) : isContract ? (
+            <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
+          ) : isSent ? (
+            <ArrowUpRight className="size-4" style={{ color: 'var(--ink-2)' }} />
           ) : (
             <ArrowDownLeft className="size-4" style={{ color: 'var(--success)' }} />
           )}
@@ -47,11 +62,21 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              {isSent ? 'Sent' : tx.direction === 'received' ? 'Received' : 'Contract Interaction'}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
+                {title}
+              </p>
+              {isContract && (
+                <span
+                  className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0"
+                  style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
+                >
+                  Contract
+                </span>
+              )}
+            </div>
             <p className="mono mt-0.5 truncate text-xs" style={{ color: 'var(--subtle)' }}>
-              {isSent ? (tx.to ? formatAddress(tx.to) : 'Contract') : formatAddress(tx.from)}
+              {subtitle}
             </p>
           </div>
           <div className="shrink-0 text-right">
@@ -59,10 +84,16 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
               className="display text-sm font-bold tabular-nums"
               style={{
                 color:
-                  tx.status === 'failed' ? 'var(--danger)' : isSent ? 'var(--ink)' : 'var(--success)',
+                  tx.status === 'failed'
+                    ? 'var(--danger)'
+                    : isContract
+                      ? 'var(--accent)'
+                      : isSent ? 'var(--ink)' : 'var(--success)',
               }}
             >
-              {isSent ? '-' : '+'}{tx.value} {tx.tokenSymbol}
+              {isContract
+                ? (tx.value !== '0.00' ? `${tx.value} ${tx.tokenSymbol}` : 'Call')
+                : `${isSent ? '-' : '+'}${tx.value} ${tx.tokenSymbol}`}
             </p>
           </div>
         </div>
@@ -112,6 +143,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'sent', label: 'Sent' },
   { key: 'received', label: 'Received' },
+  { key: 'contracts', label: 'Contracts' },
   { key: 'pending', label: 'Pending' },
   { key: 'failed', label: 'Failed' },
 ]
@@ -129,6 +161,7 @@ export function ActivityScreen({ transactions }: ActivityScreenProps) {
     if (filter === 'all') return true
     if (filter === 'sent') return tx.direction === 'sent'
     if (filter === 'received') return tx.direction === 'received'
+    if (filter === 'contracts') return tx.direction === 'contract'
     if (filter === 'pending') return tx.status === 'pending'
     if (filter === 'failed') return tx.status === 'failed'
     return true

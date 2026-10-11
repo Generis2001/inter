@@ -12,6 +12,7 @@ import { TOKENS } from '../../utils/tokens'
 import {
   ArrowUpRight,
   ArrowDownLeft,
+  FileCode,
   Copy,
   Check,
   RefreshCw,
@@ -31,7 +32,16 @@ interface DashboardScreenProps {
 
 function TxRow({ tx }: { tx: ArcTransaction }) {
   const isSent = tx.direction === 'sent'
+  const isContract = tx.direction === 'contract'
   const isFailed = tx.status === 'failed'
+
+  const title = isContract
+    ? (tx.method ?? tx.contractName ?? 'Contract')
+    : (isSent ? 'Sent' : 'Received')
+
+  const subtitle = isContract
+    ? (tx.contractName ? `${tx.contractName} · ${tx.to ? formatAddress(tx.to) : 'Contract'}` : (tx.to ? formatAddress(tx.to) : 'Contract'))
+    : (isSent ? (tx.to ? formatAddress(tx.to) : 'Contract') : formatAddress(tx.from))
 
   return (
     <a
@@ -45,11 +55,17 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
         style={{
           background: isFailed
             ? 'rgba(220,38,38,0.10)'
-            : isSent ? 'rgba(6,182,212,0.10)' : 'rgba(5,150,105,0.10)',
+            : isContract
+              ? 'rgba(6,182,212,0.14)'
+              : isSent ? 'rgba(6,182,212,0.10)' : 'rgba(5,150,105,0.10)',
         }}
       >
-        {isSent ? (
-          <ArrowUpRight className="size-4" style={{ color: isFailed ? 'var(--danger)' : 'var(--accent-light)' }} />
+        {isFailed ? (
+          <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
+        ) : isContract ? (
+          <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
+        ) : isSent ? (
+          <ArrowUpRight className="size-4" style={{ color: 'var(--accent-light)' }} />
         ) : (
           <ArrowDownLeft className="size-4" style={{ color: 'var(--success)' }} />
         )}
@@ -58,27 +74,38 @@ function TxRow({ tx }: { tx: ArcTransaction }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-              {isSent ? 'Sent' : tx.direction === 'received' ? 'Received' : 'Interaction'}
+            <p className="text-sm font-semibold truncate max-w-[150px]" style={{ color: 'var(--ink)' }}>
+              {title}
             </p>
-            <span
-              className="rounded-md px-1.5 py-0.5 text-xs font-semibold"
-              style={{ background: 'rgba(6,182,212,0.08)', color: 'var(--accent)' }}
-            >
-              {tx.tokenSymbol}
-            </span>
+            {isContract ? (
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
+              >
+                Contract
+              </span>
+            ) : (
+              <span
+                className="rounded-md px-1.5 py-0.5 text-xs font-semibold"
+                style={{ background: 'rgba(6,182,212,0.08)', color: 'var(--accent)' }}
+              >
+                {tx.tokenSymbol}
+              </span>
+            )}
           </div>
-          {/* Transaction amount — 16px / semibold */}
+          {/* Transaction amount */}
           <span
             className="amount-text"
-            style={{ color: isFailed ? 'var(--danger)' : isSent ? 'var(--ink)' : 'var(--success)' }}
+            style={{ color: isFailed ? 'var(--danger)' : isContract ? 'var(--accent)' : isSent ? 'var(--ink)' : 'var(--success)' }}
           >
-            {isSent ? '-' : '+'}{tx.value}
+            {isContract
+              ? (tx.value !== '0.00' ? `${tx.value} ${tx.tokenSymbol}` : 'Call')
+              : `${isSent ? '-' : '+'}${tx.value}`}
           </span>
         </div>
         <div className="mt-0.5 flex items-center justify-between">
-          <p className="mono truncate" style={{ color: 'var(--subtle)' }}>
-            {isSent ? (tx.to ? formatAddress(tx.to) : 'Contract') : formatAddress(tx.from)}
+          <p className="mono truncate text-xs" style={{ color: 'var(--subtle)' }}>
+            {subtitle}
           </p>
           <div className="flex items-center gap-1">
             <span className="support-text font-medium"
@@ -229,10 +256,6 @@ export function DashboardScreen({ onNavigate, onShowSend, onShowReceive, transac
               </div>
             ))}
           </div>
-
-          <p className="mt-4 support-text" style={{ color: 'var(--subtle)' }}>
-            Arc Mainnet · USDC is gas
-          </p>
         </GlassCard>
 
         {/* Recent transactions */}

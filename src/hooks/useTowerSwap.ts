@@ -22,6 +22,7 @@ import { arc } from 'viem/chains'
 import { useWallet } from '../context/WalletContext'
 import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
+import { recordTransaction } from './useArcTransactions'
 
 const TOWER_BASE = 'https://www.tower.exchange/api/public'
 const SLIPPAGE_BPS = 50   // 0.5%
@@ -261,6 +262,22 @@ export function useTowerSwap() {
               args: [spender, maxUint256],
             })
         await publicClient.waitForTransactionReceipt({ hash: approveTx })
+        recordTransaction({
+          hash: approveTx,
+          from: account.address.toLowerCase() as `0x${string}`,
+          to: tokenAddress.toLowerCase() as `0x${string}`,
+          value: '0.00',
+          rawValue: 0n,
+          tokenSymbol: tokenIn.symbol,
+          timestamp: Date.now(),
+          status: 'success',
+          direction: 'contract',
+          blockNumber: null,
+          gasUsed: '0',
+          contractName: 'Tower DEX Router',
+          method: 'Approve Spender',
+          txType: 'approval',
+        })
       }
 
       // Step 2: Swap
@@ -274,6 +291,23 @@ export function useTowerSwap() {
 
       setSwapState({ status: 'swapping', txHash })
       await publicClient.waitForTransactionReceipt({ hash: txHash })
+
+      recordTransaction({
+        hash: txHash,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: (txData.swap.to as string).toLowerCase() as `0x${string}`,
+        value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
+        rawValue: parsedIn,
+        tokenSymbol: tokenIn.symbol,
+        timestamp: Date.now(),
+        status: 'success',
+        direction: 'contract',
+        blockNumber: null,
+        gasUsed: '0',
+        contractName: 'Tower DEX Router',
+        method: 'Execute Swap',
+        txType: 'swap',
+      })
 
       setSwapState({ status: 'success', txHash, amountOut, dexName })
     } catch (err) {

@@ -1,34 +1,29 @@
-import { requireChain } from '@/onchain-facts'
-import { Wifi, WifiOff } from 'lucide-react'
-
-const ARC_MAINNET_ID = 5042
-
 interface NetworkBadgeProps {
   isConnected?: boolean
+  className?: string
 }
 
-export function NetworkBadge({ isConnected = true }: NetworkBadgeProps) {
-  const chain = requireChain(ARC_MAINNET_ID)
-
+export function NetworkBadge({ isConnected = true, className = '' }: NetworkBadgeProps) {
   return (
     <div
-      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1"
-      style={{
-        background: isConnected ? 'rgba(6,182,212,0.10)' : 'rgba(220,38,38,0.10)',
-        border: `1px solid ${isConnected ? 'rgba(6,182,212,0.30)' : 'rgba(220,38,38,0.30)'}`,
-      }}
+      className={`inline-flex items-center gap-2 ${className}`}
+      title="Arc Mainnet"
     >
-      {isConnected ? (
-        <Wifi className="size-3" style={{ color: 'var(--accent-light)' }} />
-      ) : (
-        <WifiOff className="size-3" style={{ color: 'var(--danger)' }} />
-      )}
-      <span
-        className="text-xs font-semibold"
-        style={{ color: isConnected ? 'var(--accent)' : 'var(--danger)' }}
+      {/* Official Arc Brand: Logo glyph + writeup next to it, as is, without dark background */}
+      <svg
+        viewBox="0 0 70 24"
+        className="h-5 w-auto"
+        style={{ color: 'var(--ink)' }}
+        fill="currentColor"
+        aria-label="Arc"
       >
-        {chain.name}
-      </span>
+        <path d="M39.934 2.106h-3.356l-6.742 20.608h1.972l1.766-5.476h9.363l1.766 5.476h1.972L39.934 2.106Zm-5.83 13.424 3.974-12.306h.354l3.974 12.306h-8.302Zm19.929-7.183h1.678v1.648h-1.884c-1.08 0-1.943.305-2.59.913-.648.608-.972 1.56-.972 2.855v8.95h-1.767V8.406h1.708V10.2h.353c.275-.647.682-1.118 1.222-1.413.54-.294 1.29-.441 2.252-.441Zm15.802 9.333a7.103 7.103 0 0 1-1.104 2.634c-.559.835-1.315 1.512-2.267 2.032s-2.114.78-3.489.78c-1.373 0-2.634-.3-3.724-.898-1.089-.598-1.947-1.457-2.575-2.576-.629-1.119-.943-2.433-.943-3.945v-.294c0-1.531.314-2.851.943-3.96a6.533 6.533 0 0 1 2.575-2.56c1.09-.6 2.33-.899 3.724-.899 1.395 0 2.537.26 3.49.78.95.52 1.696 1.198 2.236 2.032.54.835.879 1.713 1.016 2.635l-1.737.353a5.248 5.248 0 0 0-.737-2.105 4.29 4.29 0 0 0-1.648-1.53c-.707-.384-1.58-.575-2.62-.575s-1.973.241-2.797.722a5.206 5.206 0 0 0-1.958 2.032c-.481.874-.722 1.91-.722 3.105v.236c0 1.197.24 2.232.722 3.105a5.196 5.196 0 0 0 1.958 2.032c.824.482 1.756.722 2.797.722 1.57 0 2.767-.407 3.592-1.222.824-.814 1.334-1.81 1.53-2.988l1.737.353.001-.001ZM0 24c.195-5.876 1.19-11.36 2.856-15.623C4.965 2.975 8.018 0 11.451 0c3.434 0 6.487 2.975 8.596 8.377 1.097 2.81 1.904 6.148 2.383 9.78.043.325.08.654.116.983.012.02.02.04.017.055 0 0 .28 1.756.34 4.806h-.03c-.418-.343-5.334-4.205-13.484-3.087.123-1.379.292-2.72.51-4.007.012-.065.025-.129.036-.194 3.197-.097 5.995.274 8.14.761l-.023-.154c-.44-2.746-1.092-5.26-1.931-7.409-1.372-3.513-3.162-5.695-4.67-5.695-1.509 0-3.299 2.182-4.67 5.695a29.71 29.71 0 0 0-.906 2.712 40.53 40.53 0 0 0-.957 4.284 53.892 53.892 0 0 0-.702 7.095H0V24Z" />
+      </svg>
+      {/* Live connected status dot */}
+      <span
+        className={`size-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-rose-500'}`}
+        style={isConnected ? { boxShadow: '0 0 6px rgba(16,185,129,0.6)' } : undefined}
+      />
     </div>
   )
 }

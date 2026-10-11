@@ -14,6 +14,7 @@ import { isValidAddress, parseOnchainError } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
 import { TOKENS, type TokenInfo } from '../../utils/tokens'
+import { recordTransaction } from '../../hooks/useArcTransactions'
 
 import { createWalletClient, createPublicClient, http, erc20Abi } from 'viem'
 import { arc } from 'viem/chains'
@@ -230,6 +231,22 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
       setTxHash(hash)
 
       await publicClient.waitForTransactionReceipt({ hash })
+
+      recordTransaction({
+        hash,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: finalAddress.toLowerCase() as `0x${string}`,
+        value: parsedAmount.toFixed(2),
+        rawValue: parsedAmount.raw,
+        tokenSymbol: selectedToken.symbol,
+        timestamp: Date.now(),
+        status: 'success',
+        direction: 'sent',
+        blockNumber: null,
+        gasUsed: '0',
+        txType: 'transfer',
+      })
+
       setStep('success')
       toast.success(`${selectedToken.symbol} sent!`)
     } catch (err) {

@@ -26,6 +26,7 @@ import { arc } from 'viem/chains'
 import { useWallet } from '../context/WalletContext'
 import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
+import { recordTransaction } from './useArcTransactions'
 
 // Arc Mainnet contract addresses
 // Universal Router 2.1.2 on Arc (with Uniswap v4 support)
@@ -313,6 +314,23 @@ export function useV4Swap() {
 
       setSwapState({ status: 'swapping', txHash })
       await publicClient.waitForTransactionReceipt({ hash: txHash })
+
+      recordTransaction({
+        hash: txHash,
+        from: account.address.toLowerCase() as `0x${string}`,
+        to: UNIVERSAL_ROUTER.toLowerCase() as `0x${string}`,
+        value: Amount.fromRaw(parsed, tokenIn.decimals).toFixed(2),
+        rawValue: parsed,
+        tokenSymbol: tokenIn.symbol,
+        timestamp: Date.now(),
+        status: 'success',
+        direction: 'contract',
+        blockNumber: null,
+        gasUsed: '0',
+        contractName: 'Uniswap v4 Router',
+        method: 'Execute V4 Swap',
+        txType: 'swap',
+      })
 
       setSwapState({
         status: 'success',
