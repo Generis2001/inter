@@ -300,7 +300,7 @@ export function SettingsScreen() {
                 Lock your wallet?
               </p>
               <p className="mb-4 text-xs" style={{ color: 'var(--muted)' }}>
-                Your private key will be cleared from memory. You will need your recovery phrase to unlock again.
+                Your private key will be cleared from memory. You will need your PIN or password to unlock again.
               </p>
               <div className="flex gap-2">
                 <button

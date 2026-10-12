@@ -4,6 +4,8 @@ import { LandingScreen } from './components/onboarding/LandingScreen'
 import { CreateMnemonicScreen } from './components/onboarding/CreateMnemonicScreen'
 import { VerifyMnemonicScreen } from './components/onboarding/VerifyMnemonicScreen'
 import { ImportWalletScreen } from './components/onboarding/ImportWalletScreen'
+import { SetupPinScreen } from './components/onboarding/SetupPinScreen'
+import { UnlockScreen } from './components/onboarding/UnlockScreen'
 import { DashboardScreen } from './components/wallet/DashboardScreen'
 import { ActivityScreen } from './components/wallet/ActivityScreen'
 import { AssetsScreen } from './components/wallet/AssetsScreen'
@@ -68,6 +70,16 @@ function WalletApp() {
         {screen === 'import-wallet' && (
           <motion.div key="import" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
             <ImportWalletScreen />
+          </motion.div>
+        )}
+        {screen === 'setup-pin' && (
+          <motion.div key="setup-pin" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
+            <SetupPinScreen />
+          </motion.div>
+        )}
+        {screen === 'unlock' && (
+          <motion.div key="unlock" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+            <UnlockScreen />
           </motion.div>
         )}
       </AnimatePresence>

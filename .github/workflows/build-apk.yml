@@ -32,6 +32,8 @@ jobs:
         run: npm install --legacy-peer-deps --no-package-lock
 
       - name: Build Web Assets
+        env:
+          VITE_TOWER_API_KEY: ${{ secrets.VITE_TOWER_API_KEY }}
         run: npm run build
 
       - name: Sync Capacitor Android
@@ -56,3 +58,17 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish Direct APK Download Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest
+          name: "Inter Wallet Latest Release"
+          body: |
+            ### Direct Downloads
+            - **Android APK**: [app-debug.apk](https://github.com/Generis2001/inter/releases/latest/download/app-debug.apk)
+          files: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

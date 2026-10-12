@@ -26,6 +26,8 @@ jobs:
         run: npm install --legacy-peer-deps --no-package-lock
 
       - name: Build Web Assets (Includes Manifest V3)
+        env:
+          VITE_TOWER_API_KEY: ${{ secrets.VITE_TOWER_API_KEY }}
         run: npm run build
 
       - name: Package Chrome Extension ZIP

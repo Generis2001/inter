@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { useWallet } from '../../context/WalletContext'
 import { useTokenBalance } from '../../hooks/useTokenBalance'
 import { PageBackground } from '../shared/PageBackground'
