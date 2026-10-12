@@ -25,10 +25,13 @@ import {
   Check,
   ChevronDown,
   AtSign,
+  Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Skeleton } from '../shared/Skeleton'
+import { PinVerificationModal } from '../shared/PinVerificationModal'
+import { useRequireTxPin } from '../../utils/securitySettings'
 
 const ARC_MAINNET_ID = 5042
 
@@ -120,6 +123,18 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
   const [amountStr, setAmountStr] = useState('')
   const [txHash, setTxHash] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+
+  // Transaction PIN requirement
+  const [requirePin] = useRequireTxPin()
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+
+  const handleConfirmSendClick = () => {
+    if (requirePin) {
+      setPinModalOpen(true)
+    } else {
+      void handleSend()
+    }
+  }
 
   // ArcNS resolution — fires when recipient looks like a .arc / .circle name
   const { state: ansState, isName: recipientIsName, resolveNow } = useArcNSResolution(recipient)
@@ -302,7 +317,8 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
   }
 
   return (
-    <BottomSheet open={open} onClose={handleClose} title={`Send ${selectedToken.symbol}`}>
+    <>
+      <BottomSheet open={open} onClose={handleClose} title={`Send ${selectedToken.symbol}`}>
       <AnimatePresence mode="wait">
         {step === 'input' && (
           <motion.div key="input" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -505,11 +521,17 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
                 Back
               </button>
               <button
-                onClick={() => { void handleSend() }}
-                className="flex-1 rounded-2xl py-3.5 text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99]"
+                onClick={handleConfirmSendClick}
+                className="flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99]"
                 style={{ background: 'var(--accent)' }}
               >
-                Confirm Send
+                {requirePin ? (
+                  <>
+                    <Lock className="size-4" /> Authorize & Send
+                  </>
+                ) : (
+                  'Confirm Send'
+                )}
               </button>
             </div>
           </motion.div>
@@ -624,5 +646,16 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
         )}
       </AnimatePresence>
     </BottomSheet>
-  )
+
+    {/* Pin Verification Modal for Send */}
+    <PinVerificationModal
+      open={pinModalOpen}
+      onClose={() => setPinModalOpen(false)}
+      onSuccess={() => { void handleSend() }}
+      title="Authorize Transfer"
+      description={`Enter your 6-digit PIN to authorize sending ${amountStr} ${selectedToken.symbol}.`}
+      actionLabel="Authorize & Send"
+    />
+  </>
+)
 }

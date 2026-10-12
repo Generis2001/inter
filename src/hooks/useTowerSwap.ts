@@ -24,6 +24,7 @@ import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
 import { recordTransaction } from './useArcTransactions'
 import { parseOnchainError } from '../utils/wallet'
+import { recordKnownSpender } from '../utils/allowances'
 
 const TOWER_BASE = 'https://www.tower.exchange/api/public'
 const ARC_CHAIN_ID = 5042
@@ -229,7 +230,7 @@ export function useTowerSwap(slippageBps = 50) {
     }
   }, [amountIn, tokenIn, tokenOut, slippageBps])
 
-  const executeSwap = useCallback(async () => {
+  const executeSwap = useCallback(async (options?: { unlimitedApproval?: boolean }) => {
     if (!account) return
     if (swapState.status !== 'quoted') return
     const { quoteData, amountOut, dexName } = swapState
@@ -271,8 +272,11 @@ export function useTowerSwap(slippageBps = 50) {
 
       if (currentAllowance < parsedIn) {
         setSwapState({ status: 'approving' })
+        const isUnlimited = !!options?.unlimitedApproval
+        const approvalAmount = isUnlimited ? maxUint256 : parsedIn
         const approveData = txData.approve?.data as `0x${string}` | undefined
-        const approveTx = approveData
+
+        const approveTx = isUnlimited && approveData
           ? await walletClient.sendTransaction({
               account: viemAcct,
               to: tokenAddress,
@@ -284,15 +288,23 @@ export function useTowerSwap(slippageBps = 50) {
               address: tokenAddress,
               abi: ERC20_ABI,
               functionName: 'approve',
-              args: [spender, maxUint256],
+              args: [spender, approvalAmount],
             })
         await publicClient.waitForTransactionReceipt({ hash: approveTx })
+
+        recordKnownSpender(account.address, {
+          tokenAddress,
+          tokenSymbol: tokenIn.symbol,
+          spenderAddress: spender,
+          spenderName: 'Tower DEX Router',
+        })
+
         recordTransaction({
           hash: approveTx,
           from: account.address.toLowerCase() as `0x${string}`,
           to: tokenAddress.toLowerCase() as `0x${string}`,
-          value: '0.00',
-          rawValue: 0n,
+          value: isUnlimited ? 'Unlimited' : Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
+          rawValue: parsedIn,
           tokenSymbol: tokenIn.symbol,
           timestamp: Date.now(),
           status: 'success',
@@ -300,7 +312,7 @@ export function useTowerSwap(slippageBps = 50) {
           blockNumber: null,
           gasUsed: '0',
           contractName: 'Tower DEX Router',
-          method: 'Approve Spender',
+          method: isUnlimited ? 'Approve Unlimited' : 'Approve Exact Amount',
           txType: 'approval',
         })
       }

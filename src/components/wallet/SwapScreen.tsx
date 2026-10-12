@@ -22,8 +22,15 @@ import {
   ExternalLink,
   ChevronRight,
   Settings2,
+  ShieldCheck,
+  ShieldAlert,
+  ArrowRight,
+  Lock,
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { BottomSheet } from '../shared/BottomSheet'
+import { PinVerificationModal } from '../shared/PinVerificationModal'
+import { useRequireTxPin } from '../../utils/securitySettings'
 
 const ARC_MAINNET_ID = 5042
 
@@ -66,6 +73,31 @@ export function SwapScreen() {
   // Slippage settings panel state
   const [showSlippage, setShowSlippage] = useState(false)
   const [customSlippage, setCustomSlippage] = useState('')
+
+  // Confirmation bottom sheet & approval security options
+  const [requirePin] = useRequireTxPin()
+  const [showConfirmSheet, setShowConfirmSheet] = useState(false)
+  const [unlimitedApproval, setUnlimitedApproval] = useState(false)
+  const [pinModalOpen, setPinModalOpen] = useState(false)
+
+  const handleInitiateSwap = () => {
+    if (!canSwap) return
+    setShowConfirmSheet(true)
+  }
+
+  const handleConfirmSwap = () => {
+    if (requirePin) {
+      setPinModalOpen(true)
+    } else {
+      setShowConfirmSheet(false)
+      void executeSwap({ unlimitedApproval })
+    }
+  }
+
+  const handlePinSuccess = () => {
+    setShowConfirmSheet(false)
+    void executeSwap({ unlimitedApproval })
+  }
 
   // Sync custom input when preset changes
   /* oxlint-disable-next-line react/set-state-in-effect */
@@ -632,7 +664,7 @@ export function SwapScreen() {
           </div>
         ) : (
           <button
-            onClick={() => { void executeSwap() }}
+            onClick={handleInitiateSwap}
             disabled={!canSwap}
             className="flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             style={{
@@ -660,7 +692,7 @@ export function SwapScreen() {
               'insufficient gas (USDC)'
             ) : isQuoted ? (
               <>
-                Swap <ChevronRight className="size-4" />
+                Review Swap <ChevronRight className="size-4" />
               </>
             ) : (
               'Swap'
@@ -676,6 +708,182 @@ export function SwapScreen() {
           ? 'Optimal routing via Tower Exchange across Arc DEXes'
           : 'Direct swap via Uniswap v4 on Arc Mainnet'}
       </p>
+
+      {/* Review & Confirm Swap Bottom Sheet */}
+      <BottomSheet
+        open={showConfirmSheet}
+        onClose={() => setShowConfirmSheet(false)}
+        title="Review Swap"
+      >
+        <div className="px-5 pb-8 pt-2">
+          {/* Swap visual cards: Pay and Receive */}
+          <div className="space-y-2">
+            <div
+              className="flex items-center justify-between rounded-2xl p-3.5"
+              style={{
+                background: 'rgba(255,255,255,0.70)',
+                border: '1px solid rgba(18,45,69,0.08)',
+              }}
+            >
+              <div>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>You Pay</p>
+                <p className="display text-xl font-bold" style={{ color: 'var(--ink)' }}>
+                  {amountIn} {tokenIn.symbol}
+                </p>
+              </div>
+              <TokenIcon symbol={tokenIn.symbol} size={36} />
+            </div>
+
+            <div className="relative z-10 -my-1 flex justify-center">
+              <div
+                className="flex size-7 items-center justify-center rounded-full shadow-sm"
+                style={{ background: 'var(--accent)', color: '#fff' }}
+              >
+                <ArrowRight className="size-3.5 rotate-90" />
+              </div>
+            </div>
+
+            <div
+              className="flex items-center justify-between rounded-2xl p-3.5"
+              style={{
+                background: 'rgba(255,255,255,0.70)',
+                border: '1px solid rgba(18,45,69,0.08)',
+              }}
+            >
+              <div>
+                <p className="text-xs" style={{ color: 'var(--muted)' }}>You Receive (Est.)</p>
+                <p className="display text-xl font-bold" style={{ color: 'var(--ink)' }}>
+                  {swapState.status === 'quoted' ? swapState.amountOut.toFixed(4) : '0.00'} {tokenOut.symbol}
+                </p>
+              </div>
+              <TokenIcon symbol={tokenOut.symbol} size={36} />
+            </div>
+          </div>
+
+          {/* Trade Details Breakdown */}
+          <div
+            className="mt-3.5 space-y-2 rounded-2xl p-3.5"
+            style={{ background: 'rgba(18,45,69,0.04)' }}
+          >
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--muted)' }}>DEX Router</span>
+              <span className="flex items-center gap-1.5 font-semibold" style={{ color: 'var(--ink)' }}>
+                {routeDisplay(route, 'dexName' in swapState ? (swapState as { dexName: string }).dexName : undefined)}
+                <ShieldCheck className="size-3.5 text-emerald-600" />
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--muted)' }}>Min. Received (Guaranteed)</span>
+              <span className="font-semibold" style={{ color: 'var(--ink)' }}>
+                {swapState.status === 'quoted'
+                  ? (swapState.amountOut.raw - (swapState.amountOut.raw * BigInt(slippageBps)) / 10_000n > 0n
+                      ? Amount.fromRaw(
+                          swapState.amountOut.raw - (swapState.amountOut.raw * BigInt(slippageBps)) / 10_000n,
+                          tokenOut.decimals,
+                        ).toFixed(4)
+                      : swapState.amountOut.toFixed(4))
+                  : '0.00'}{' '}
+                {tokenOut.symbol}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--muted)' }}>Max Slippage</span>
+              <span className="font-semibold" style={{ color: 'var(--ink)' }}>
+                {(slippageBps / 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--muted)' }}>Network Fee</span>
+              <span className="font-semibold text-emerald-600">~0.007 USDC (Paid on Arc)</span>
+            </div>
+          </div>
+
+          {/* Option 3: Exact-Amount vs Unlimited Approval Policy Control */}
+          <label
+            className="mt-3.5 flex cursor-pointer items-start gap-3 rounded-2xl p-3.5 transition-all"
+            style={{
+              background: 'rgba(255,255,255,0.75)',
+              border: unlimitedApproval
+                ? '1px solid rgba(234,179,8,0.40)'
+                : '1px solid rgba(6,182,212,0.25)',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={unlimitedApproval}
+              onChange={(e) => setUnlimitedApproval(e.target.checked)}
+              className="mt-0.5 size-4 rounded accent-cyan-600"
+            />
+            <div className="text-left">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
+                  Remember approval for future swaps (Unlimited)
+                </span>
+                {unlimitedApproval ? (
+                  <span
+                    className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold"
+                    style={{ background: 'rgba(234,179,8,0.15)', color: '#b45309' }}
+                  >
+                    <ShieldAlert className="size-2.5" /> Unlimited
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold"
+                    style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
+                  >
+                    <ShieldCheck className="size-2.5" /> Exact Only
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-[11px]" style={{ color: 'var(--muted)' }}>
+                {unlimitedApproval
+                  ? 'Avoids repeating approval transactions and fees for future swaps.'
+                  : `Safest default: approves only ${amountIn} ${tokenIn.symbol} for this transaction.`}
+              </p>
+            </div>
+          </label>
+
+          {/* Confirm Action Button */}
+          <div className="mt-5 flex gap-2.5">
+            <button
+              onClick={() => setShowConfirmSheet(false)}
+              className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:bg-black/5"
+              style={{
+                background: 'rgba(255,255,255,0.60)',
+                border: '1px solid rgba(18,45,69,0.12)',
+                color: 'var(--ink)',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmSwap}
+              className="flex flex-[2] items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99]"
+              style={{ background: 'var(--accent-gradient)' }}
+            >
+              {requirePin ? (
+                <>
+                  <Lock className="size-4" /> Authorize & Swap
+                </>
+              ) : (
+                <>
+                  Confirm Swap <ChevronRight className="size-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </BottomSheet>
+
+      {/* Pin Verification Modal for Swap */}
+      <PinVerificationModal
+        open={pinModalOpen}
+        onClose={() => setPinModalOpen(false)}
+        onSuccess={handlePinSuccess}
+        title="Authorize Swap"
+        description={`Enter your 6-digit PIN to authorize swapping ${amountIn} ${tokenIn.symbol}.`}
+        actionLabel="Authorize & Swap"
+      />
     </div>
   )
 }

@@ -28,6 +28,7 @@ import { TOKENS, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
 import { recordTransaction } from './useArcTransactions'
 import { parseOnchainError } from '../utils/wallet'
+import { recordKnownSpender } from '../utils/allowances'
 
 // Arc Mainnet contract addresses
 // Universal Router 2.1.2 on Arc (with Uniswap v4 support)
@@ -239,7 +240,7 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
     }
   }, [amountIn, tokenIn, tokenOut])
 
-  const executeSwap = useCallback(async () => {
+  const executeSwap = useCallback(async (options?: { unlimitedApproval?: boolean }) => {
     if (!account) return
     const parsed = parseAmountSafe(amountIn, tokenIn.decimals)
     if (!parsed || parsed === 0n) return
@@ -264,6 +265,8 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
 
       const walletClient = createWalletClient({ account: viemAcct, chain: arc, transport: http() })
 
+      const isUnlimited = !!options?.unlimitedApproval
+
       // Step 1: Ensure ERC-20 -> Permit2 approval
       const erc20Allowance = await publicClient.readContract({
         address: tokenIn.address,
@@ -272,14 +275,39 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
         args: [account.address, PERMIT2],
       })
       if (erc20Allowance < parsed) {
+        const erc20ApprovalAmount = isUnlimited ? maxUint256 : parsed
         const approveTx = await walletClient.writeContract({
           account: viemAcct,
           address: tokenIn.address,
           abi: ERC20_ABI,
           functionName: 'approve',
-          args: [PERMIT2, maxUint256],
+          args: [PERMIT2, erc20ApprovalAmount],
         })
         await publicClient.waitForTransactionReceipt({ hash: approveTx })
+
+        recordKnownSpender(account.address, {
+          tokenAddress: tokenIn.address,
+          tokenSymbol: tokenIn.symbol,
+          spenderAddress: PERMIT2,
+          spenderName: 'Uniswap v4 Permit2',
+        })
+
+        recordTransaction({
+          hash: approveTx,
+          from: account.address.toLowerCase() as `0x${string}`,
+          to: tokenIn.address.toLowerCase() as `0x${string}`,
+          value: isUnlimited ? 'Unlimited' : Amount.fromRaw(parsed, tokenIn.decimals).toFixed(2),
+          rawValue: parsed,
+          tokenSymbol: tokenIn.symbol,
+          timestamp: Date.now(),
+          status: 'success',
+          direction: 'contract',
+          blockNumber: null,
+          gasUsed: '0',
+          contractName: 'Uniswap v4 Permit2',
+          method: isUnlimited ? 'Approve Unlimited' : 'Approve Exact Amount',
+          txType: 'approval',
+        })
       }
 
       // Step 2: Ensure Permit2 -> Universal Router allowance
@@ -291,14 +319,22 @@ export function useV4Swap(slippageBps = DEFAULT_SLIPPAGE_BPS) {
       })
       if ((permit2Amount) < parsed) {
         const expiry = Math.floor(Date.now() / 1000) + PERMIT2_EXPIRY_SECONDS
+        const permit2ApprovalAmount = isUnlimited ? (2n ** 160n - 1n) : parsed
         const permit2Tx = await walletClient.writeContract({
           account: viemAcct,
           address: PERMIT2,
           abi: PERMIT2_ABI,
           functionName: 'approve',
-          args: [tokenIn.address, UNIVERSAL_ROUTER, (2n ** 160n - 1n), expiry],
+          args: [tokenIn.address, UNIVERSAL_ROUTER, permit2ApprovalAmount, expiry],
         })
         await publicClient.waitForTransactionReceipt({ hash: permit2Tx })
+
+        recordKnownSpender(account.address, {
+          tokenAddress: tokenIn.address,
+          tokenSymbol: tokenIn.symbol,
+          spenderAddress: UNIVERSAL_ROUTER,
+          spenderName: 'Universal Router',
+        })
       }
 
       // Step 3: Quote then build swap calldata
