@@ -316,7 +316,7 @@ export function DashboardScreen({
             </button>
           </div>
           <div className="border-t" style={{ borderColor: 'var(--border)' }}>
-            {txLoading ? (
+            {txLoading && recentTxnsTyped.length === 0 ? (
               <div className="space-y-1 p-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="flex items-center gap-3 px-2 py-2.5">

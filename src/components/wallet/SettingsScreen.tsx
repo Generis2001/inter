@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useWallet } from '../../context/WalletContext'
 import { useArcBalance } from '../../hooks/useArcBalance'
 import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
 import { WalletIdenticon } from '../shared/WalletIdenticon'
+import { BottomSheet } from '../shared/BottomSheet'
 import { formatAddress } from '../../utils/wallet'
+import { unlockStoredVault, hasStoredVault } from '../../utils/vault'
 import { buildAddressExplorerUrl, requireChain } from '@/onchain-facts'
 import {
   Copy,
@@ -16,6 +18,9 @@ import {
   Globe,
   Info,
   ChevronRight,
+  EyeOff,
+  Delete,
+  KeyRound,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -28,8 +33,17 @@ export function SettingsScreen() {
   const { formatted } = useArcBalance(address)
   const chain = requireChain(ARC_MAINNET_ID)
   const [copiedAddress, setCopiedAddress] = useState(false)
-  const [showMnemonic, setShowMnemonic] = useState(false)
+  const [copiedPhrase, setCopiedPhrase] = useState(false)
+  const [isPhraseRevealed, setIsPhraseRevealed] = useState(false)
   const [lockConfirm, setLockConfirm] = useState(false)
+
+  // Auth sheet state for revealing recovery phrase
+  const [authSheetOpen, setAuthSheetOpen] = useState(false)
+  const [authPin, setAuthPin] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [isPasswordMode, setIsPasswordMode] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [errorShake, setErrorShake] = useState(false)
 
   const handleCopyAddress = async () => {
     if (!address) return
@@ -42,6 +56,67 @@ export function SettingsScreen() {
       toast.error('Copy failed')
     }
   }
+
+  const handleCopyPhrase = async () => {
+    if (!mnemonic) return
+    try {
+      await navigator.clipboard.writeText(mnemonic)
+      setCopiedPhrase(true)
+      toast.success('Recovery phrase copied')
+      setTimeout(() => setCopiedPhrase(false), 2000)
+    } catch {
+      toast.error('Copy failed')
+    }
+  }
+
+  const handleToggleReveal = () => {
+    if (isPhraseRevealed) {
+      setIsPhraseRevealed(false)
+      return
+    }
+    if (hasStoredVault()) {
+      setAuthPin('')
+      setAuthPassword('')
+      setAuthSheetOpen(true)
+    } else {
+      setIsPhraseRevealed(true)
+    }
+  }
+
+  const handleVerifyCredential = useCallback(async (credential: string) => {
+    if (!credential) return
+    setVerifying(true)
+    try {
+      await unlockStoredVault(credential)
+      setIsPhraseRevealed(true)
+      setAuthSheetOpen(false)
+      toast.success('Identity verified — phrase revealed')
+    } catch {
+      setErrorShake(true)
+      setTimeout(() => setErrorShake(false), 500)
+      setAuthPin('')
+      setAuthPassword('')
+      toast.error('Incorrect PIN or password')
+    } finally {
+      setVerifying(false)
+    }
+  }, [])
+
+  const handlePinDigit = useCallback((digit: string) => {
+    if (verifying) return
+    if (authPin.length < 6) {
+      const next = authPin + digit
+      setAuthPin(next)
+      if (next.length === 6) {
+        void handleVerifyCredential(next)
+      }
+    }
+  }, [authPin, verifying, handleVerifyCredential])
+
+  const handlePinDelete = useCallback(() => {
+    if (verifying) return
+    setAuthPin((prev) => prev.slice(0, -1))
+  }, [verifying])
 
   return (
     <PageBackground>
@@ -182,22 +257,29 @@ export function SettingsScreen() {
             {mnemonic && (
               <div>
                 <button
-                  onClick={() => setShowMnemonic((v) => !v)}
+                  onClick={handleToggleReveal}
                   className="flex w-full items-center justify-between px-4 py-3.5 transition-all hover:bg-black/4"
                 >
-                  <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                    Show Recovery Phrase
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {isPhraseRevealed ? (
+                      <EyeOff className="size-4" style={{ color: 'var(--accent)' }} />
+                    ) : (
+                      <Lock className="size-4" style={{ color: 'var(--subtle)' }} />
+                    )}
+                    <span className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
+                      {isPhraseRevealed ? 'Hide Recovery Phrase' : 'Show Recovery Phrase'}
+                    </span>
+                  </div>
                   <ChevronRight
                     className="size-4 transition-transform"
                     style={{
                       color: 'var(--subtle)',
-                      transform: showMnemonic ? 'rotate(90deg)' : 'none',
+                      transform: isPhraseRevealed ? 'rotate(90deg)' : 'none',
                     }}
                   />
                 </button>
                 <AnimatePresence>
-                  {showMnemonic && (
+                  {isPhraseRevealed && (
                     <motion.div
                       className="border-t px-4 pb-4 pt-3"
                       style={{ borderColor: 'var(--border)' }}
@@ -206,13 +288,23 @@ export function SettingsScreen() {
                       exit={{ height: 0, opacity: 0 }}
                     >
                       <div
-                        className="mb-3 flex gap-2 rounded-xl p-3"
+                        className="mb-3 flex items-start justify-between gap-2 rounded-xl p-3"
                         style={{ background: 'rgba(186,43,76,0.06)', border: '1px solid rgba(186,43,76,0.15)' }}
                       >
-                        <AlertTriangle className="mt-0.5 size-3.5 shrink-0" style={{ color: 'var(--danger)' }} />
-                        <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                          Never share this phrase. Anyone with it has full access to your wallet.
-                        </p>
+                        <div className="flex gap-2">
+                          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" style={{ color: 'var(--danger)' }} />
+                          <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                            Never share this phrase. Anyone with it has full access to your funds.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => { void handleCopyPhrase() }}
+                          className="flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold transition-all hover:bg-black/5"
+                          style={{ color: 'var(--ink)' }}
+                        >
+                          {copiedPhrase ? <Check className="size-3 text-emerald-600" /> : <Copy className="size-3" />}
+                          {copiedPhrase ? 'Copied' : 'Copy'}
+                        </button>
                       </div>
                       <div className="grid grid-cols-3 gap-1.5">
                         {mnemonic.split(' ').map((word, i) => (
@@ -326,6 +418,146 @@ export function SettingsScreen() {
           )}
         </div>
       </div>
+
+      {/* Security Verification Bottom Sheet */}
+      <BottomSheet
+        open={authSheetOpen}
+        onClose={() => setAuthSheetOpen(false)}
+        title="Security Verification"
+      >
+        <div className="px-5 pb-8 pt-2 text-center">
+          <div
+            className="mx-auto mb-3 flex size-12 items-center justify-center rounded-2xl"
+            style={{
+              background: 'rgba(6,182,212,0.12)',
+              border: '1px solid rgba(6,182,212,0.22)',
+            }}
+          >
+            <Shield className="size-6" style={{ color: 'var(--accent)' }} />
+          </div>
+          <h3 className="display text-lg font-bold" style={{ color: 'var(--ink)' }}>
+            {isPasswordMode ? 'Enter Wallet Password' : 'Enter 6-Digit PIN'}
+          </h3>
+          <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>
+            Verify your PIN or password to reveal your recovery phrase.
+          </p>
+
+          <motion.div
+            animate={errorShake ? { x: [-8, 8, -6, 6, -3, 3, 0] } : {}}
+            transition={{ duration: 0.4 }}
+            className="py-4"
+          >
+            {isPasswordMode ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  void handleVerifyCredential(authPassword)
+                }}
+                className="space-y-3"
+              >
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="Enter wallet password"
+                  autoFocus
+                  className="w-full rounded-2xl px-4 py-3.5 text-center text-sm outline-none"
+                  style={{
+                    background: 'rgba(255,255,255,0.75)',
+                    border: '1px solid rgba(6,182,212,0.25)',
+                    color: 'var(--ink)',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={verifying || !authPassword}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold text-white transition-all disabled:opacity-40"
+                  style={{ background: 'var(--accent-gradient)' }}
+                >
+                  {verifying ? 'Verifying...' : 'Unlock Phrase'}
+                </button>
+              </form>
+            ) : (
+              <div>
+                {/* PIN dots */}
+                <div className="mb-6 flex justify-center gap-3.5">
+                  {[0, 1, 2, 3, 4, 5].map((index) => {
+                    const isFilled = index < authPin.length
+                    return (
+                      <motion.div
+                        key={index}
+                        animate={{
+                          scale: isFilled ? [1, 1.25, 1] : 1,
+                          backgroundColor: isFilled ? 'var(--accent)' : 'rgba(6,182,212,0.15)',
+                        }}
+                        transition={{ duration: 0.15 }}
+                        className="size-4 rounded-full border"
+                        style={{
+                          borderColor: isFilled ? 'var(--accent)' : 'rgba(6,182,212,0.30)',
+                          boxShadow: isFilled ? '0 0 10px rgba(6,182,212,0.35)' : 'none',
+                        }}
+                      />
+                    )
+                  })}
+                </div>
+
+                {/* Keypad */}
+                <div className="mx-auto grid max-w-[260px] grid-cols-3 gap-2.5">
+                  {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((digit) => (
+                    <button
+                      key={digit}
+                      onClick={() => handlePinDigit(digit)}
+                      disabled={verifying}
+                      className="flex size-14 items-center justify-center rounded-2xl text-lg font-bold transition-all hover:bg-black/5 active:scale-95 active:bg-cyan-100/40"
+                      style={{
+                        background: 'rgba(255,255,255,0.70)',
+                        border: '1px solid rgba(6,182,212,0.14)',
+                        color: 'var(--ink)',
+                      }}
+                    >
+                      {digit}
+                    </button>
+                  ))}
+                  <div className="size-14" />
+                  <button
+                    onClick={() => handlePinDigit('0')}
+                    disabled={verifying}
+                    className="flex size-14 items-center justify-center rounded-2xl text-lg font-bold transition-all hover:bg-black/5 active:scale-95 active:bg-cyan-100/40"
+                    style={{
+                      background: 'rgba(255,255,255,0.70)',
+                      border: '1px solid rgba(6,182,212,0.14)',
+                      color: 'var(--ink)',
+                    }}
+                  >
+                    0
+                  </button>
+                  <button
+                    onClick={handlePinDelete}
+                    disabled={verifying}
+                    className="flex size-14 items-center justify-center rounded-2xl transition-all hover:bg-black/5 active:scale-95"
+                    style={{
+                      background: 'rgba(255,255,255,0.40)',
+                      color: 'var(--muted)',
+                    }}
+                    aria-label="Delete last digit"
+                  >
+                    <Delete className="size-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+
+          <button
+            onClick={() => setIsPasswordMode((prev) => !prev)}
+            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold hover:underline"
+            style={{ color: 'var(--accent)' }}
+          >
+            <KeyRound className="size-3.5" />
+            {isPasswordMode ? 'Use 6-Digit PIN instead' : 'Use wallet password instead'}
+          </button>
+        </div>
+      </BottomSheet>
     </PageBackground>
   )
 }

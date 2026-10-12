@@ -3,7 +3,7 @@
  * Parses USDC, EURC ERC-20 token transfers, and contract interactions.
  * Uses the Arc Mainnet block explorer API with fallback to local transaction store.
  */
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { requireChain } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
 import { TOKENS, TOKEN_BY_ADDRESS } from '../utils/tokens'
@@ -114,6 +114,30 @@ function safeBigInt(v: unknown): bigint | undefined {
   return undefined
 }
 
+/**
+ * Persist transactions specifically and strictly for an address.
+ * Transactions from different wallets are strictly separated.
+ */
+export function persistWalletTransactions(address: string, txs: ArcTransaction[]) {
+  try {
+    const addr = address.toLowerCase()
+    const key = `inter_wallet_txs_${addr}`
+    const strictlyThisWallet = txs.filter((item) => {
+      if (!item || !item.hash) return false
+      const from = item.from?.toLowerCase()
+      const to = item.to?.toLowerCase()
+      return from === addr || to === addr
+    }).slice(0, 100)
+
+    localStorage.setItem(
+      key,
+      JSON.stringify(strictlyThisWallet, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
+    )
+  } catch {
+    // local storage unavailable
+  }
+}
+
 export function recordTransaction(tx: ArcTransaction) {
   try {
     const sanitizedTx: ArcTransaction = {
@@ -121,26 +145,33 @@ export function recordTransaction(tx: ArcTransaction) {
       value: sanitizeTxValue(tx.value, tx.rawValue),
     }
 
-    const fromKey = sanitizedTx.from ? `inter_tx_history_${sanitizedTx.from.toLowerCase()}` : null
-    const toKey = sanitizedTx.to ? `inter_tx_history_${sanitizedTx.to.toLowerCase()}` : null
-    const globalKey = 'inter_tx_history_all'
-
-    const saveToKey = (key: string) => {
-      const stored = localStorage.getItem(key)
+    const saveForAddress = (addr: string) => {
+      const cleanAddr = addr.toLowerCase()
+      const key = `inter_wallet_txs_${cleanAddr}`
       let existing: ArcTransaction[] = []
-      if (stored) {
-        try {
+      try {
+        const stored = localStorage.getItem(key)
+        if (stored) {
           const parsed = JSON.parse(stored)
           if (Array.isArray(parsed)) existing = parsed
-        } catch {}
-      }
-      const updated = [sanitizedTx, ...existing.filter((item) => item.hash?.toLowerCase() !== sanitizedTx.hash?.toLowerCase())].slice(0, 50)
-      localStorage.setItem(key, JSON.stringify(updated, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)))
+        }
+      } catch {}
+
+      const updated = [
+        sanitizedTx,
+        ...existing.filter((item) => item.hash?.toLowerCase() !== sanitizedTx.hash?.toLowerCase()),
+      ].slice(0, 100)
+
+      localStorage.setItem(
+        key,
+        JSON.stringify(updated, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
+      )
     }
 
-    if (fromKey) saveToKey(fromKey)
-    if (toKey && toKey !== fromKey) saveToKey(toKey)
-    saveToKey(globalKey)
+    if (sanitizedTx.from) saveForAddress(sanitizedTx.from)
+    if (sanitizedTx.to && sanitizedTx.to.toLowerCase() !== sanitizedTx.from?.toLowerCase()) {
+      saveForAddress(sanitizedTx.to)
+    }
 
     window.dispatchEvent(new CustomEvent('inter_tx_recorded', { detail: sanitizedTx }))
   } catch {
@@ -149,66 +180,54 @@ export function recordTransaction(tx: ArcTransaction) {
 }
 
 export function getRecordedTransactions(address: string | undefined): ArcTransaction[] {
+  if (!address) return []
   try {
+    const addr = address.toLowerCase()
+    const key = `inter_wallet_txs_${addr}`
     const txMap = new Map<string, ArcTransaction>()
-    const addr = address?.toLowerCase()
 
-    // Collect keys to check
-    const keysToCheck: string[] = ['inter_tx_history_all']
-    if (addr) {
-      keysToCheck.push(`inter_tx_history_${addr}`)
-    }
-    // Also scan all localStorage keys to never miss any recorded tx
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i)
-      if (k && (k.startsWith('inter_tx_history') || k.startsWith('inter_transactions'))) {
-        if (!keysToCheck.includes(k)) keysToCheck.push(k)
-      }
-    }
-
-    for (const key of keysToCheck) {
-      const stored = localStorage.getItem(key)
-      if (stored) {
-        try {
-          const list: ArcTransaction[] = JSON.parse(stored)
-          if (Array.isArray(list)) {
-            for (const item of list) {
-              if (item && item.hash) {
-                // Sanitize any existing item that was saved with 10^12 extra scaling
-                item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
-
-                // If address is specified, check if it matches from or to, or if from global store
-                if (!addr || item.from?.toLowerCase() === addr || item.to?.toLowerCase() === addr || key === `inter_tx_history_${addr}`) {
-                  const hashKey = item.hash.toLowerCase()
-                  if (!txMap.has(hashKey) || item.status === 'success') {
-                    txMap.set(hashKey, item)
-                  }
-                }
-              }
-            }
-          }
-        } catch {
-          // ignore corrupted key
-        }
-      }
-    }
-
-    // Fallback: If no address match, return all from global store so the user always sees their activity
-    if (txMap.size === 0) {
-      const globalStored = localStorage.getItem('inter_tx_history_all')
-      if (globalStored) {
-        try {
-          const list: ArcTransaction[] = JSON.parse(globalStored)
-          if (Array.isArray(list)) {
-            for (const item of list) {
-              if (item && item.hash) {
+    // 1. Read primary wallet storage
+    const stored = localStorage.getItem(key)
+    if (stored) {
+      try {
+        const list: ArcTransaction[] = JSON.parse(stored)
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (item && item.hash) {
+              const from = item.from?.toLowerCase()
+              const to = item.to?.toLowerCase()
+              if (from === addr || to === addr) {
                 item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
                 txMap.set(item.hash.toLowerCase(), item)
               }
             }
           }
-        } catch {}
-      }
+        }
+      } catch {}
+    }
+
+    // 2. Also check legacy address key if present for smooth backward compatibility
+    const legacyKey = `inter_tx_history_${addr}`
+    const legacyStored = localStorage.getItem(legacyKey)
+    if (legacyStored) {
+      try {
+        const list: ArcTransaction[] = JSON.parse(legacyStored)
+        if (Array.isArray(list)) {
+          for (const item of list) {
+            if (item && item.hash) {
+              const from = item.from?.toLowerCase()
+              const to = item.to?.toLowerCase()
+              if (from === addr || to === addr) {
+                const hashKey = item.hash.toLowerCase()
+                if (!txMap.has(hashKey)) {
+                  item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
+                  txMap.set(hashKey, item)
+                }
+              }
+            }
+          }
+        }
+      } catch {}
     }
 
     return Array.from(txMap.values()).sort((a, b) => b.timestamp - a.timestamp)
@@ -223,23 +242,35 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
   const [isError, setIsError] = useState(false)
   const chain = requireChain(ARC_MAINNET_ID)
 
+  // Ref keeps track of rendered transactions to prevent race conditions & flicker
+  const transactionsRef = useRef<ArcTransaction[]>(transactions)
+
   // Sync state whenever address becomes available or changes
   useEffect(() => {
     const local = getRecordedTransactions(address)
     /* oxlint-disable-next-line react/set-state-in-effect */
     setTransactions(local)
+    transactionsRef.current = local
   }, [address])
+
+  useEffect(() => {
+    transactionsRef.current = transactions
+  }, [transactions])
 
   const fetchTxns = useCallback(async () => {
     if (!address) return
-    setIsLoading(true)
+
+    // CRITICAL: Only flash loading skeletons if we don't have any cached transactions.
+    // Background polling while transactions are rendered will NEVER flicker or hide history.
+    if (transactionsRef.current.length === 0) {
+      setIsLoading(true)
+    }
     setIsError(false)
 
-    // Load local storage immediately so UI never flickers empty
-    const localTxns = getRecordedTransactions(address)
-    if (localTxns.length > 0) {
-      setTransactions(localTxns)
-    }
+    const addrLower = address.toLowerCase()
+    const freshLocal = getRecordedTransactions(address)
+    const freshLocalMap = new Map<string, ArcTransaction>()
+    for (const t of freshLocal) freshLocalMap.set(t.hash.toLowerCase(), t)
 
     let parsed: ArcTransaction[] = []
 
@@ -378,6 +409,10 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
             const toAddr = ('0x' + log.topics[2].slice(26)).toLowerCase() as `0x${string}`
             const isSent = fromAddr === address.toLowerCase()
 
+            // Maintain stable timestamp if transaction was already seen
+            const existingTx = freshLocalMap.get(log.transactionHash.toLowerCase())
+            const timestamp = existingTx?.timestamp ?? Date.now()
+
             parsed.push({
               hash: log.transactionHash,
               from: fromAddr,
@@ -385,7 +420,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
               value: formatTransactionValue(rawVal, tokenInfo.symbol, tokenAddr),
               rawValue: rawVal,
               tokenSymbol: tokenInfo.symbol,
-              timestamp: Date.now(),
+              timestamp,
               status: 'success',
               direction: isSent ? 'sent' : 'received',
               blockNumber: BigInt(log.blockNumber),
@@ -400,7 +435,6 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
     }
 
     // Merge parsed explorer/RPC txns with all recorded local transactions
-    const freshLocal = getRecordedTransactions(address)
     const txMap = new Map<string, ArcTransaction>()
 
     for (const t of freshLocal) txMap.set(t.hash.toLowerCase(), t)
@@ -421,8 +455,14 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       }
     }
 
-    const combined = Array.from(txMap.values()).sort((a, b) => b.timestamp - a.timestamp)
-    setTransactions(combined)
+    // STRICT wallet isolation: only keep transactions belonging to this address
+    const strictlyThisWallet = Array.from(txMap.values())
+      .filter((t) => t.from?.toLowerCase() === addrLower || t.to?.toLowerCase() === addrLower)
+      .sort((a, b) => b.timestamp - a.timestamp)
+
+    persistWalletTransactions(address, strictlyThisWallet)
+    setTransactions(strictlyThisWallet)
+    transactionsRef.current = strictlyThisWallet
     setIsLoading(false)
   }, [address, chain.explorerBase, chain.rpcUrls])
 

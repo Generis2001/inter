@@ -41,3 +41,14 @@ jobs:
           name: Inter-Chrome-Extension
           path: inter-chrome-extension.zip
           retention-days: 30
+
+      - name: Attach Extension to Latest Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest
+          files: |
+            inter-chrome-extension.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
