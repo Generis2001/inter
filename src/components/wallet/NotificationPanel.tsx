@@ -5,8 +5,8 @@ import { buildTxExplorerUrl } from '@/onchain-facts'
 import { TokenIcon } from '../shared/TokenLogo'
 import { formatAddress } from '../../utils/wallet'
 import type { WalletNotification } from '../../hooks/useNotifications'
+import { useNetwork } from '../../context/NetworkContext'
 
-const ARC_MAINNET_ID = 5042
 
 interface NotificationPanelProps {
   open: boolean
@@ -18,12 +18,13 @@ interface NotificationPanelProps {
 }
 
 function NotifItem({ n }: { n: WalletNotification }) {
+  const { chainId } = useNetwork()
   const isReceived = n.type === 'received'
   const isFailed = n.type === 'failed'
 
   return (
     <a
-      href={buildTxExplorerUrl(ARC_MAINNET_ID, n.txHash)}
+      href={buildTxExplorerUrl(chainId, n.txHash)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-start gap-3 px-4 py-3.5 transition-all hover:bg-black/4"
@@ -145,8 +146,8 @@ export function NotificationPanel({
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             className="fixed right-4 top-16 z-50 w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-3xl shadow-2xl"
             style={{
-              background: 'rgba(255,255,255,0.96)',
-              border: '1px solid rgba(18,45,69,0.10)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
               backdropFilter: 'blur(20px)',
             }}
           >

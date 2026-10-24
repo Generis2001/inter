@@ -63,10 +63,10 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
         <div className="relative">
           <button
             onClick={() => setShowPicker((v) => !v)}
-            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 transition-all hover:bg-black/4"
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 transition-all hover:opacity-90"
             style={{
-              background: 'rgba(255,255,255,0.70)',
-              border: '1px solid rgba(18,45,69,0.12)',
+              background: 'var(--surface-muted)',
+              border: '1px solid var(--border)',
             }}
           >
             <TokenIcon symbol={selectedToken.symbol} size={28} />
@@ -89,18 +89,18 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
                 exit={{ opacity: 0, y: -4 }}
                 className="absolute left-0 top-full z-50 mt-1.5 w-full overflow-hidden rounded-2xl shadow-xl"
                 style={{
-                  background: 'rgba(255,255,255,0.96)',
-                  border: '1px solid rgba(18,45,69,0.12)',
-                  backdropFilter: 'blur(12px)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  backdropFilter: 'blur(16px)',
                 }}
               >
                 {TOKENS.map((t) => (
                   <button
                     key={t.symbol}
                     onClick={() => { setSelectedToken(t); setShowPicker(false) }}
-                    className="flex w-full items-center gap-3 px-4 py-3 transition-all hover:bg-black/5"
+                    className="flex w-full items-center gap-3 px-4 py-3 transition-all hover:bg-black/5 dark:hover:bg-white/5"
                     style={{
-                      background: t.symbol === selectedToken.symbol ? 'rgba(18,45,69,0.05)' : 'transparent',
+                      background: t.symbol === selectedToken.symbol ? 'var(--accent-subtle)' : 'transparent',
                     }}
                   >
                     <TokenIcon symbol={t.symbol} size={28} />
@@ -122,8 +122,8 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
 
       {/* QR code */}
       <div className="mb-5 flex flex-col items-center">
-        <div className="relative mb-4 overflow-hidden rounded-3xl p-4"
-          style={{ background: 'white', boxShadow: '0 4px 24px rgba(18,45,69,0.10)' }}>
+        <div className="relative mb-4 overflow-hidden rounded-3xl p-4 shadow-xl"
+          style={{ background: '#FFFFFF', border: '1px solid rgba(0,0,0,0.06)' }}>
           <canvas ref={canvasRef} style={{ display: 'block', borderRadius: '12px' }} />
           {/* Token badge overlaid on QR */}
           <div className="absolute bottom-6 right-6 rounded-full border-2 border-white shadow-md">
@@ -143,10 +143,10 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
       <div className="mb-5 grid grid-cols-2 gap-3">
         <button
           onClick={() => { void handleCopy() }}
-          className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:bg-black/8 active:scale-[0.98]"
+          className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:opacity-90 active:scale-[0.98]"
           style={{
-            background: 'rgba(255,255,255,0.60)',
-            border: '1px solid rgba(18,45,69,0.12)',
+            background: 'var(--surface-muted)',
+            border: '1px solid var(--border)',
             color: 'var(--ink)',
           }}
         >
@@ -155,7 +155,7 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
         </button>
         <button
           onClick={() => { void handleShare() }}
-          className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.99]"
+          className="flex items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-semibold text-white transition-all hover:opacity-95 active:scale-[0.99]"
           style={{ background: 'var(--accent)' }}
         >
           <Share2 className="size-4" />
@@ -165,7 +165,7 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
 
       {/* Warning */}
       <div className="flex gap-2.5 rounded-2xl p-4"
-        style={{ background: 'rgba(18,45,69,0.04)', border: '1px solid rgba(18,45,69,0.08)' }}>
+        style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)' }}>
         <AlertTriangle className="mt-0.5 size-4 shrink-0" style={{ color: 'var(--subtle)' }} />
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
           Only send <strong>{selectedToken.symbol}</strong> on the <strong>Arc</strong> network to this address. Sending assets from other networks may result in permanent loss.

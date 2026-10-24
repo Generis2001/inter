@@ -2,75 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Inter font ─────────────────────────────────────────────────────────── */
+/* Zerion & Inter typography */
 :root {
-  font-family: 'Inter', sans-serif;
-  font-feature-settings: 'cv11', 'ss01';          /* Inter optical features  */
+  font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv11", "ss01", "cv01", "tnum";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Design tokens ────────────────────────────────────────────────────────
-   Primary: Cyan-Blue   #0EA5E9  (sky-500) → #06B6D4 (cyan-500)
-   The gradient flows from cyan-500 → sky-500, giving a clean "water" feel.
-───────────────────────────────────────────────────────────────────────────── */
+/* Design tokens - Light (Zerion clean aesthetic) */
 :root {
-  /* Backgrounds */
-  --bg: #f0f9ff;
-  --bg-gradient: linear-gradient(160deg, #e0f2fe 0%, #f0f9ff 40%, #ecfeff 100%);
-
-  /* Surfaces */
-  --surface: rgba(255, 255, 255, 0.75);
-  --surface-strong: rgba(255, 255, 255, 0.92);
-  --surface-muted: #f0f9ff;
-
-  /* Text */
-  --ink:   #0c1a2e;          /* near-black with a cyan undertone */
-  --ink-2: #1e3a4c;
-  --muted: #4b6475;
-  --subtle: #7a9aaa;
-
-  /* Borders */
-  --border:        rgba(6, 182, 212, 0.14);
-  --border-strong: rgba(6, 182, 212, 0.40);
-
-  /* Primary accent — cyan-sky gradient exposed as a solid and as a gradient */
-  --accent:         #0891b2;          /* cyan-600 — used for solid buttons */
-  --accent-light:   #06b6d4;          /* cyan-500 */
-  --accent-lighter: #cffafe;          /* cyan-100 — chip backgrounds etc.  */
-  --accent-hover:   #0e7490;          /* cyan-700 */
-  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
-
-  /* Focus ring */
-  --focus: rgba(6, 182, 212, 0.45);
-
-  /* Semantic */
+  --bg: #f8fafc;
+  --bg-gradient: radial-gradient(circle at 50% 0%, #e8f4fc 0%, #f4f8fb 50%, #eef5fb 100%);
+  --surface: rgba(255, 255, 255, 0.88);
+  --surface-strong: #ffffff;
+  --surface-muted: #f1f5f9;
+  --ink:   #090d16;
+  --ink-2: #1e293b;
+  --muted: #475569;
+  --subtle: #64748b;
+  --border:        rgba(6, 182, 212, 0.16);
+  --border-strong: rgba(6, 182, 212, 0.35);
+  --accent:         #0891b2;
+  --accent-light:   #06b6d4;
+  --accent-lighter: #e0f8ff;
+  --accent-hover:   #0e7490;
+  --accent-gradient: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
+  --focus: rgba(6, 182, 212, 0.40);
   --success: #059669;
   --danger:  #dc2626;
+  --glass-bg:           rgba(255, 255, 255, 0.82);
+  --glass-bg-inner:     rgba(241, 245, 249, 0.85);
+  --glass-bg-pill:      rgba(255, 255, 255, 0.90);
+  --glass-border:       rgba(6, 182, 212, 0.16);
+  --glass-inner-border: rgba(6, 182, 212, 0.12);
+  --glass-pill-border:  rgba(6, 182, 212, 0.16);
+  --glass-shadow:       0 8px 30px rgba(6, 182, 212, 0.08), inset 0 1px 0 rgba(255,255,255,0.80);
+  --sheet-bg:      #ffffff;
+  --nav-bg:        rgba(255, 255, 255, 0.94);
+  --nav-shadow:    0 -4px 20px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255,255,255,0.80);
+  --header-bg:     rgba(248, 250, 252, 0.92);
+  --header-border: rgba(6, 182, 212, 0.14);
+  --text-balance:  clamp(32px, 8vw, 42px);
+  --text-section:  clamp(20px, 5vw, 24px);
+  --text-body:     15px;
+  --text-amount:   16px;
+  --text-support:  13px;
+}
 
-  /* Type scale helpers (used as utility classes below) */
-  --text-balance:  clamp(32px, 8vw, 40px);   /* 32–40 px / bold  */
-  --text-section:  clamp(20px, 5vw, 24px);   /* 20–24 px / semibold */
-  --text-body:     15px;                     /* 14–16 px / regular  */
-  --text-amount:   16px;                     /* 16 px / semibold    */
-  --text-support:  13px;                     /* 12–14 px / regular  */
+/* Design tokens - Dark (Zerion obsidian / deep slate) */
+[data-theme="dark"] {
+  --bg: #07090e;
+  --bg-gradient: radial-gradient(circle at 50% 0%, #111726 0%, #07090e 65%, #05060a 100%);
+  --surface: #111622;
+  --surface-strong: #161c2b;
+  --surface-muted: #182030;
+  --ink:   #ffffff;
+  --ink-2: #cbd5e1;
+  --muted: #94a3b8;
+  --subtle: #64748b;
+  --border:        rgba(255, 255, 255, 0.09);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --accent:         #00c2ff;
+  --accent-light:   #38d9ff;
+  --accent-lighter: rgba(0, 194, 255, 0.14);
+  --accent-hover:   #00a8de;
+  --accent-gradient: linear-gradient(135deg, #00c2ff 0%, #0077ff 100%);
+  --focus: rgba(0, 194, 255, 0.45);
+  --success: #10b981;
+  --danger:  #f87171;
+  --glass-bg:           rgba(17, 22, 34, 0.85);
+  --glass-bg-inner:     rgba(24, 32, 48, 0.75);
+  --glass-bg-pill:      rgba(26, 35, 54, 0.85);
+  --glass-border:       rgba(255, 255, 255, 0.10);
+  --glass-inner-border: rgba(255, 255, 255, 0.07);
+  --glass-pill-border:  rgba(255, 255, 255, 0.10);
+  --glass-shadow:       0 12px 36px rgba(0, 0, 0, 0.50), inset 0 1px 0 rgba(255,255,255,0.08);
+  --sheet-bg:      #0f1420;
+  --nav-bg:        rgba(13, 17, 27, 0.95);
+  --nav-shadow:    0 -6px 24px rgba(0, 0, 0, 0.60), inset 0 1px 0 rgba(255,255,255,0.08);
+  --header-bg:     rgba(9, 12, 19, 0.94);
+  --header-border: rgba(255, 255, 255, 0.08);
 }
 
 * { box-sizing: border-box; }
 
-/* ─── Mobile Safe Area & Extension Adaptations ─────────────────────────── */
 :root {
   --safe-area-top: env(safe-area-inset-top, 0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Chrome extension popup styling */
 html.is-extension-popup {
   width: 390px;
   height: 600px;
   overflow: hidden;
 }
-
 html.is-extension-popup body {
   width: 390px;
   height: 600px;
@@ -80,79 +106,119 @@ html.is-extension-popup body {
   overflow-x: hidden;
   position: relative;
 }
-
 html.is-extension-popup #root {
   width: 100%;
   min-height: 100%;
   position: relative;
 }
 
-/* Smooth mobile scrolling & tap highlighting */
-html, body {
-  -webkit-tap-highlight-color: transparent;
-}
+html, body { -webkit-tap-highlight-color: transparent; }
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: var(--text-body);
   min-height: 100dvh;
   background: var(--bg-gradient);
   color: var(--ink);
   padding-top: var(--safe-area-top);
   padding-bottom: var(--safe-area-bottom);
+  transition: background 0.3s ease, color 0.2s ease;
 }
 
-/* ─── Utility font classes ────────────────────────────────────────────────── */
-
-/* Balance figures — 32–40 px / 800 */
 .balance-text {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: var(--text-balance);
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1;
 }
-
-/* Section headings — 20–24 px / 600 */
 .section-heading {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: var(--text-section);
   font-weight: 600;
   letter-spacing: -0.02em;
 }
-
-/* Transaction amounts — 16 px / 600 */
 .amount-text {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: var(--text-amount);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
 }
-
-/* Supporting / meta text — 12–14 px / 400 */
 .support-text {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   font-size: var(--text-support);
   font-weight: 400;
 }
-
-/* Monospace addresses */
 .mono {
-  font-family: 'JetBrains Mono', Menlo, monospace;
+  font-family: "JetBrains Mono", Menlo, monospace;
   font-size: 12px;
 }
-
-/* Keep .display as an alias for section-heading (used throughout codebase) */
 .display {
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   letter-spacing: -0.03em;
 }
 
-/* ─── Sonner toast overrides ─────────────────────────────────────────────── */
+/* Tailwind hover/active overrides for dark mode */
+[data-theme="dark"] .hover\:bg-black\/5:hover   { background-color: rgba(255,255,255,0.06) !important; }
+[data-theme="dark"] .hover\:bg-black\/4:hover   { background-color: rgba(255,255,255,0.05) !important; }
+[data-theme="dark"] .active\:bg-black\/6:active  { background-color: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] .hover\:bg-cyan-50\/60:hover { background-color: rgba(6,182,212,0.10) !important; }
+[data-theme="dark"] .active\:bg-cyan-50:active   { background-color: rgba(6,182,212,0.14) !important; }
+[data-theme="dark"] .hover\:bg-red-50:hover      { background-color: rgba(220,38,38,0.08) !important; }
+[data-theme="dark"] .bg-black\/10                { background-color: rgba(255,255,255,0.12) !important; }
+[data-theme="dark"] .divide-y > * + *            { border-color: var(--border) !important; }
+
+/* Sonner toast overrides */
 [data-sonner-toaster] {
   --normal-bg:     rgba(255, 255, 255, 0.94);
   --normal-border: rgba(6, 182, 212, 0.18);
   --normal-text:   #0c1a2e;
 }
+[data-theme="dark"] [data-sonner-toaster] {
+  --normal-bg:     #121724;
+  --normal-border: rgba(255, 255, 255, 0.15);
+  --normal-text:   #ffffff;
+}
+
+/* Zerion-style high-contrast dark mode surface overrides (fixes washed-out text and blurred characters) */
+[data-theme="dark"] [style*="rgba(255,255,255"],
+[data-theme="dark"] [style*="rgba(255, 255, 255"],
+[data-theme="dark"] [style*="rgba(240,249,255"],
+[data-theme="dark"] [style*="rgba(240, 249, 255"] {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="dark"] input {
+  color: #ffffff !important;
+  caret-color: var(--accent) !important;
+}
+
+[data-theme="dark"] input::placeholder {
+  color: #475569 !important;
+  opacity: 1 !important;
+}
+
+[data-theme="dark"] .bg-white,
+[data-theme="dark"] .bg-white\/90,
+[data-theme="dark"] .bg-white\/80 {
+  background-color: var(--surface) !important;
+}
+
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800 {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .text-slate-600,
+[data-theme="dark"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .border-slate-200,
+[data-theme="dark"] .border-slate-100 {
+  border-color: var(--border) !important;
+}
+

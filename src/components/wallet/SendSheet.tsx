@@ -18,6 +18,8 @@ import { recordTransaction } from '../../hooks/useArcTransactions'
 
 import { createWalletClient, createPublicClient, http, erc20Abi } from 'viem'
 import { arc } from 'viem/chains'
+import { arcTestnet } from '../../config'
+import { useNetwork } from '../../context/NetworkContext'
 import {
   ExternalLink,
   Loader2,
@@ -33,7 +35,6 @@ import { Skeleton } from '../shared/Skeleton'
 import { PinVerificationModal } from '../shared/PinVerificationModal'
 import { useRequireTxPin } from '../../utils/securitySettings'
 
-const ARC_MAINNET_ID = 5042
 
 type SendStep = 'input' | 'confirm' | 'submitting' | 'success' | 'error'
 
@@ -57,10 +58,10 @@ function AssetPicker({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-2xl px-3 py-2 transition-all hover:bg-black/5"
+        className="flex items-center gap-2 rounded-2xl px-3 py-2 transition-all hover:opacity-90"
         style={{
-          background: 'rgba(255,255,255,0.70)',
-          border: '1px solid rgba(18,45,69,0.12)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
         }}
       >
         <TokenIcon symbol={selected.symbol} size={22} />
@@ -78,18 +79,18 @@ function AssetPicker({
             exit={{ opacity: 0, y: -4, scale: 0.97 }}
             className="absolute left-0 top-full z-50 mt-1.5 min-w-[140px] overflow-hidden rounded-2xl shadow-xl"
             style={{
-              background: 'rgba(255,255,255,0.96)',
-              border: '1px solid rgba(18,45,69,0.12)',
-              backdropFilter: 'blur(12px)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              backdropFilter: 'blur(16px)',
             }}
           >
             {TOKENS.map((t) => (
               <button
                 key={t.symbol}
                 onClick={() => { onChange(t); setOpen(false) }}
-                className="flex w-full items-center gap-2.5 px-3.5 py-3 transition-all hover:bg-black/5"
+                className="flex w-full items-center gap-2.5 px-3.5 py-3 transition-all hover:bg-black/5 dark:hover:bg-white/5"
                 style={{
-                  background: t.symbol === selected.symbol ? 'rgba(18,45,69,0.05)' : 'transparent',
+                  background: t.symbol === selected.symbol ? 'var(--accent-subtle)' : 'transparent',
                 }}
               >
                 <TokenIcon symbol={t.symbol} size={24} />
@@ -112,6 +113,8 @@ function AssetPicker({
 
 export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
   const { account } = useWallet()
+  const { isTestnet, chainId } = useNetwork()
+  const viemChain = isTestnet ? arcTestnet : arc
   const address = account?.address
 
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(initialToken ?? TOKENS[0])
@@ -232,8 +235,8 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
       // HDAccount and PrivateKeyAccount both satisfy viem's Account interface
       type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A } ? NonNullable<A> : never
       const viemAcct = account as unknown as ViemAccount
-      const walletClient = createWalletClient({ account: viemAcct, chain: arc, transport: http() })
-      const publicClient = createPublicClient({ chain: arc, transport: http() })
+      const walletClient = createWalletClient({ account: viemAcct, chain: viemChain, transport: http() })
+      const publicClient = createPublicClient({ chain: viemChain, transport: http() })
 
       const hash = await walletClient.writeContract({
         account: viemAcct,
@@ -259,7 +262,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
         blockNumber: null,
         gasUsed: '0',
         txType: 'transfer',
-      })
+      }, chainId)
 
       await publicClient.waitForTransactionReceipt({ hash })
 
@@ -277,7 +280,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
         blockNumber: null,
         gasUsed: '0',
         txType: 'transfer',
-      })
+      }, chainId)
 
       setStep('success')
       toast.success(`${selectedToken.symbol} sent!`)
@@ -335,14 +338,14 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
                   />
                 )}
                 <input
-                  className="w-full rounded-2xl py-3 text-sm outline-none placeholder:text-slate-300"
+                  className="w-full rounded-2xl py-3 text-sm outline-none placeholder:text-slate-400"
                   style={{
-                    background: 'rgba(255,255,255,0.60)',
+                    background: 'var(--surface-muted)',
                     border: recipientError
-                      ? '1px solid rgba(186,43,76,0.40)'
+                      ? '1px solid rgba(186,43,76,0.50)'
                       : ansState.status === 'resolved'
-                        ? '1px solid rgba(5,150,105,0.30)'
-                        : '1px solid rgba(18,45,69,0.12)',
+                        ? '1px solid rgba(5,150,105,0.40)'
+                        : '1px solid var(--border)',
                     color: 'var(--ink)',
                     paddingLeft: recipientIsName ? '2.25rem' : '1rem',
                     fontFamily: recipientIsName ? 'inherit' : 'monospace',
@@ -385,13 +388,13 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             <div
               className="mb-2 rounded-2xl p-4"
               style={{
-                background: 'rgba(255,255,255,0.46)',
-                border: amountError ? '1px solid rgba(186,43,76,0.40)' : '1px solid rgba(255,255,255,0.56)',
+                background: 'var(--surface-muted)',
+                border: amountError ? '1px solid rgba(186,43,76,0.50)' : '1px solid var(--border)',
               }}
             >
               <input
                 inputMode="decimal"
-                className="display w-full bg-transparent text-4xl font-bold tabular-nums outline-none placeholder:text-slate-300"
+                className="display w-full bg-transparent text-4xl font-bold tabular-nums outline-none placeholder:text-slate-400"
                 style={{ color: 'var(--ink)' }}
                 placeholder="0.00"
                 value={amountStr}
@@ -424,12 +427,12 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             )}
 
             {/* Fee estimate */}
-            <div className="mb-5 flex items-center justify-between rounded-xl px-3 py-2.5"
-              style={{ background: 'rgba(18,45,69,0.04)' }}>
+            <div className="mb-5 flex items-center justify-between rounded-xl px-3.5 py-2.5"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
               <span className="text-xs" style={{ color: 'var(--subtle)' }}>
                 Estimated network fee
               </span>
-              <span className="mono text-xs font-semibold tabular-nums" style={{ color: 'var(--ink-2)' }}>
+              <span className="mono text-xs font-semibold tabular-nums" style={{ color: 'var(--ink)' }}>
                 {feeFormatted} USDC
               </span>
             </div>
@@ -489,7 +492,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
                 <div
                   key={label}
                   className={`flex items-center justify-between px-4 py-3.5 ${i > 0 ? 'border-t' : ''}`}
-                  style={{ borderColor: 'var(--border)', background: 'rgba(255,255,255,0.60)' }}
+                  style={{ borderColor: 'var(--border)', background: 'var(--surface-muted)' }}
                 >
                   <span className="text-sm" style={{ color: 'var(--muted)' }}>{label}</span>
                   <span className={`text-sm font-semibold ${mono ? 'mono' : ''}`} style={{ color: 'var(--ink)' }}>
@@ -501,7 +504,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
 
             {/* Warning */}
             <div className="mb-5 flex gap-2 rounded-xl p-3"
-              style={{ background: 'rgba(186,43,76,0.05)', border: '1px solid rgba(186,43,76,0.12)' }}>
+              style={{ background: 'rgba(186,43,76,0.08)', border: '1px solid rgba(186,43,76,0.20)' }}>
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0" style={{ color: 'var(--danger)' }} />
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
                 This transaction is irreversible. Once confirmed, it cannot be undone.
@@ -511,10 +514,10 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             <div className="flex gap-3">
               <button
                 onClick={() => setStep('input')}
-                className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:bg-black/5"
+                className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:opacity-90"
                 style={{
-                  background: 'rgba(255,255,255,0.60)',
-                  border: '1px solid rgba(18,45,69,0.12)',
+                  background: 'var(--surface-muted)',
+                  border: '1px solid var(--border)',
                   color: 'var(--ink)',
                 }}
               >
@@ -553,7 +556,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             </p>
             {txHash && (
               <a
-                href={buildTxExplorerUrl(ARC_MAINNET_ID, txHash)}
+                href={buildTxExplorerUrl(chainId, txHash)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 flex items-center gap-1.5 text-xs font-semibold"
@@ -583,13 +586,13 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
               {selectedToken.symbol} transaction confirmed on Arc
             </p>
             <a
-              href={buildTxExplorerUrl(ARC_MAINNET_ID, txHash)}
+              href={buildTxExplorerUrl(chainId, txHash)}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:bg-black/5"
+              className="mt-4 flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:opacity-90"
               style={{
-                background: 'rgba(255,255,255,0.60)',
-                border: '1px solid rgba(18,45,69,0.12)',
+                background: 'var(--surface-muted)',
+                border: '1px solid var(--border)',
                 color: 'var(--ink)',
               }}
             >
@@ -597,7 +600,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             </a>
             <button
               onClick={handleClose}
-              className="mt-3 w-full rounded-2xl py-3.5 text-sm font-semibold text-white"
+              className="mt-3 w-full rounded-2xl py-3.5 text-sm font-semibold text-white transition-all hover:opacity-95"
               style={{ background: 'var(--accent)' }}
             >
               Done
@@ -625,10 +628,10 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             <div className="mt-5 flex w-full gap-3">
               <button
                 onClick={handleClose}
-                className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:bg-black/5"
+                className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:opacity-90"
                 style={{
-                  background: 'rgba(255,255,255,0.60)',
-                  border: '1px solid rgba(18,45,69,0.12)',
+                  background: 'var(--surface-muted)',
+                  border: '1px solid var(--border)',
                   color: 'var(--ink)',
                 }}
               >

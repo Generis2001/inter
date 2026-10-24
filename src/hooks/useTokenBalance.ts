@@ -1,11 +1,12 @@
 /**
- * Generic ERC-20 balance hook for any token on Arc Mainnet.
- * Used for both USDC and EURC.
+ * Generic ERC-20 balance hook for any token on the active Arc chain.
+ * Used for both USDC and EURC. Network is read from NetworkContext.
  */
 import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { Amount } from '@/onchain-money'
-import { ARC_MAINNET_ID, type TokenInfo } from '../utils/tokens'
+import { type TokenInfo } from '../utils/tokens'
+import { useNetwork } from '../context/NetworkContext'
 
 export interface TokenBalance {
   raw: bigint | undefined
@@ -20,19 +21,20 @@ export function useTokenBalance(
   token: TokenInfo,
   address: `0x${string}` | undefined,
 ): TokenBalance {
+  const { chainId } = useNetwork()
+
   const { data, isLoading, isError, refetch } = useReadContract({
     address: token.address,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    chainId: ARC_MAINNET_ID,
+    chainId,
     query: {
       enabled: !!address,
       refetchInterval: 15_000,
     },
   })
 
-  // Safely parse data to Amount — never throw on null, undefined, or unexpected shapes
   let amount: Amount | undefined
   try {
     if (typeof data === 'bigint') {

@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { useWallet } from '../../context/WalletContext'
 import { useArcBalance } from '../../hooks/useArcBalance'
+import { useNetwork } from '../../context/NetworkContext'
 import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
 import { WalletIdenticon } from '../shared/WalletIdenticon'
 import { formatAddress } from '../../utils/wallet'
 import { hasStoredVault } from '../../utils/vault'
-import { buildAddressExplorerUrl, requireChain } from '@/onchain-facts'
+import { buildAddressExplorerUrl } from '@/onchain-facts'
 import { useRequireTxPin } from '../../utils/securitySettings'
 import { ApprovedSpendersModal } from './ApprovedSpendersModal'
 import { PinVerificationModal } from '../shared/PinVerificationModal'
@@ -27,13 +28,13 @@ import {
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const ARC_MAINNET_ID = 5042
+
 
 export function SettingsScreen() {
   const { account, mnemonic, lockWallet } = useWallet()
+  const { chain, chainId } = useNetwork()
   const address = account?.address
   const { formatted } = useArcBalance(address)
-  const chain = requireChain(ARC_MAINNET_ID)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [copiedPhrase, setCopiedPhrase] = useState(false)
   const [isPhraseRevealed, setIsPhraseRevealed] = useState(false)
@@ -147,7 +148,7 @@ export function SettingsScreen() {
                 </button>
                 {address && (
                   <a
-                    href={buildAddressExplorerUrl(ARC_MAINNET_ID, address)}
+                    href={buildAddressExplorerUrl(chainId, address)}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{ color: 'var(--subtle)' }}
@@ -324,7 +325,7 @@ export function SettingsScreen() {
                           <div
                             key={i}
                             className="flex items-center gap-1 rounded-lg px-2 py-1.5"
-                            style={{ background: 'rgba(255,255,255,0.46)', border: '1px solid rgba(255,255,255,0.56)' }}
+                            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
                           >
                             <span className="mono text-xs tabular-nums" style={{ color: 'var(--subtle)', minWidth: '14px' }}>
                               {i + 1}.
@@ -412,8 +413,8 @@ export function SettingsScreen() {
                   onClick={() => setLockConfirm(false)}
                   className="flex-1 rounded-xl py-2.5 text-sm font-semibold"
                   style={{
-                    background: 'rgba(255,255,255,0.60)',
-                    border: '1px solid rgba(18,45,69,0.12)',
+                    background: 'var(--surface-muted)',
+                    border: '1px solid var(--border)',
                     color: 'var(--ink)',
                   }}
                 >

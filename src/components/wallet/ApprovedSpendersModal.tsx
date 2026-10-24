@@ -24,8 +24,8 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useNetwork } from '../../context/NetworkContext'
 
-const ARC_MAINNET_ID = 5042
 
 interface ApprovedSpendersModalProps {
   open: boolean
@@ -34,6 +34,7 @@ interface ApprovedSpendersModalProps {
 
 export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalProps) {
   const { account } = useWallet()
+  const { chainId } = useNetwork()
   const [requirePin] = useRequireTxPin()
   const [allowances, setAllowances] = useState<ActiveAllowance[]>([])
   const [loading, setLoading] = useState(false)
@@ -163,8 +164,8 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
                       exit={{ opacity: 0, scale: 0.95 }}
                       className="rounded-2xl p-3.5 transition-all"
                       style={{
-                        background: 'rgba(255,255,255,0.70)',
-                        border: '1px solid rgba(18,45,69,0.10)',
+                        background: 'var(--surface-muted)',
+                        border: '1px solid var(--border)',
                       }}
                     >
                       <div className="flex items-center justify-between">
@@ -203,7 +204,7 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
                                 {item.spenderAddress.slice(0, 6)}...{item.spenderAddress.slice(-4)}
                               </span>
                               <a
-                                href={buildTxExplorerUrl(ARC_MAINNET_ID, item.spenderAddress)}
+                                href={buildTxExplorerUrl(chainId, item.spenderAddress)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="transition-opacity hover:opacity-75"

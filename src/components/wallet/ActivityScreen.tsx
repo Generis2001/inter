@@ -8,12 +8,13 @@ import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { ArrowUpRight, ArrowDownLeft, FileCode, ExternalLink } from 'lucide-react'
 import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
+import { useNetwork } from '../../context/NetworkContext'
 
-const ARC_MAINNET_ID = 5042
 
 type Filter = 'all' | 'sent' | 'received' | 'swaps' | 'pending' | 'failed'
 
 function TxItem({ tx }: { tx: ArcTransaction }) {
+  const { chainId } = useNetwork()
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
   const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
@@ -31,7 +32,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
 
   return (
     <a
-      href={buildTxExplorerUrl(ARC_MAINNET_ID, tx.hash)}
+      href={buildTxExplorerUrl(chainId, tx.hash)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-black/4"

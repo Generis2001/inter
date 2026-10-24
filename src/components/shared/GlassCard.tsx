@@ -3,21 +3,21 @@ import { clsx } from 'clsx'
 
 const glass = {
   card: {
-    background: 'rgba(255, 255, 255, 0.70)',
+    background: 'var(--glass-bg)',
     backdropFilter: 'blur(24px) saturate(180%)',
     WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-    border: '1px solid rgba(6, 182, 212, 0.15)',
-    boxShadow: '0 8px 32px rgba(6, 182, 212, 0.08), inset 0 1px 0 rgba(255,255,255,0.60)',
+    border: '1px solid var(--glass-border)',
+    boxShadow: 'var(--glass-shadow)',
   } as React.CSSProperties,
   inner: {
-    background: 'rgba(255, 255, 255, 0.52)',
-    border: '1px solid rgba(6, 182, 212, 0.12)',
+    background: 'var(--glass-bg-inner)',
+    border: '1px solid var(--glass-inner-border)',
   } as React.CSSProperties,
   pill: {
-    background: 'rgba(255, 255, 255, 0.62)',
+    background: 'var(--glass-bg-pill)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
-    border: '1px solid rgba(6, 182, 212, 0.14)',
+    border: '1px solid var(--glass-pill-border)',
   } as React.CSSProperties,
 }
 

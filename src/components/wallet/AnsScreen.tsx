@@ -138,7 +138,7 @@ function LookupResult({ input }: { input: string }) {
             </span>
           </div>
           <div className="border-t px-4 py-3"
-            style={{ borderColor: 'rgba(5,150,105,0.14)', background: 'rgba(255,255,255,0.60)' }}>
+            style={{ borderColor: 'rgba(5,150,105,0.20)', background: 'var(--surface)' }}>
             <p className="text-xs font-semibold" style={{ color: 'var(--subtle)' }}>Resolves to</p>
             <p className="mono mt-0.5 break-all text-sm font-medium" style={{ color: 'var(--ink)' }}>
               {state.address}
@@ -244,10 +244,10 @@ export function AnsScreen() {
               style={{ color: 'var(--subtle)' }}
             />
             <input
-              className="w-full rounded-2xl py-3 pl-10 pr-4 text-sm outline-none placeholder:text-slate-300"
+              className="w-full rounded-2xl py-3 pl-10 pr-4 text-sm outline-none placeholder:text-slate-400"
               style={{
-                background: 'rgba(255,255,255,0.60)',
-                border: '1px solid rgba(18,45,69,0.12)',
+                background: 'var(--surface-muted)',
+                border: '1px solid var(--border)',
                 color: 'var(--ink)',
               }}
               placeholder="generis.arc or generis.circle"

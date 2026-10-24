@@ -30,7 +30,7 @@ export function BottomSheet({ open, onClose, title, children, showSpectral = tru
           <motion.section
             className="relative w-full max-w-md overflow-hidden rounded-t-3xl"
             style={{
-              background: 'rgba(255,255,255,0.92)',
+              background: 'var(--sheet-bg)',
               backdropFilter: 'blur(40px) saturate(200%)',
               WebkitBackdropFilter: 'blur(40px) saturate(200%)',
               maxHeight: '90dvh',

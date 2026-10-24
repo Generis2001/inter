@@ -31,8 +31,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { BottomSheet } from '../shared/BottomSheet'
 import { PinVerificationModal } from '../shared/PinVerificationModal'
 import { useRequireTxPin } from '../../utils/securitySettings'
+import { useNetwork } from '../../context/NetworkContext'
 
-const ARC_MAINNET_ID = 5042
 
 const SLIPPAGE_PRESETS = [0.1, 0.3, 0.5, 1.0]
 
@@ -63,12 +63,14 @@ export function SwapScreen() {
   const { formatted: balanceOut, refetch: refetchOut } = useTokenBalance(tokenOut, account?.address)
   const { raw: usdcRaw, refetch: refetchUsdc } = useTokenBalance(TOKENS[0], account?.address)
 
+  const { chainId, isTestnet } = useNetwork()
+
   // Native Arc gas token balance (18 decimals USDC)
   const { data: nativeBalance, refetch: refetchNative } = useBalance({
     address: account?.address,
-    chainId: ARC_MAINNET_ID,
+    chainId,
   })
-  const { data: gasPrice } = useGasPrice({ chainId: ARC_MAINNET_ID })
+  const { data: gasPrice } = useGasPrice({ chainId })
 
   // Slippage settings panel state
   const [showSlippage, setShowSlippage] = useState(false)
@@ -173,6 +175,14 @@ export function SwapScreen() {
   // Gas balance validation (USDC is native fee token on Arc)
   const hasInsufficientGas = (() => {
     if (!account) return false
+    // On Testnet: Testnet operates independently and does not require mainnet USDC or mainnet native gas.
+    if (isTestnet) {
+      if (rawBalanceIn !== undefined && rawBalanceIn === 0n && (nativeBalance === undefined || nativeBalance.value === 0n)) {
+        return true
+      }
+      return false
+    }
+    // Mainnet checks (exact original behaviour preserved):
     // 1. If native gas balance is loaded and below required threshold
     if (nativeBalance !== undefined && nativeBalance.value < minRequiredGasWei) {
       return true
@@ -262,13 +272,13 @@ export function SwapScreen() {
           via {dexName}
         </p>
         <a
-          href={buildTxExplorerUrl(ARC_MAINNET_ID, swapState.txHash)}
+          href={buildTxExplorerUrl(chainId, swapState.txHash)}
           target="_blank"
           rel="noopener noreferrer"
-          className="mb-5 flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:bg-black/5"
+          className="mb-5 flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
           style={{
-            background: 'rgba(255,255,255,0.60)',
-            border: '1px solid rgba(18,45,69,0.12)',
+            background: 'var(--surface-muted)',
+            border: '1px solid var(--border)',
             color: 'var(--ink)',
           }}
         >
@@ -351,11 +361,10 @@ export function SwapScreen() {
             className="overflow-hidden"
           >
             <div
-              className="rounded-2xl p-4"
+              className="rounded-2xl p-4 shadow-sm"
               style={{
-                background: 'rgba(255,255,255,0.80)',
-                border: '1px solid rgba(6,182,212,0.14)',
-                boxShadow: '0 2px 12px rgba(6,182,212,0.06)',
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
               }}
             >
               <div className="mb-3 flex items-center justify-between">
@@ -428,17 +437,17 @@ export function SwapScreen() {
       <div
         className="rounded-3xl p-5"
         style={{
-          background: 'rgba(255,255,255,0.72)',
-          border: '1px solid rgba(6,182,212,0.14)',
-          boxShadow: '0 4px 24px rgba(6,182,212,0.08)',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--glass-shadow)',
         }}
       >
         {/* From token */}
         <div
           className="mb-2 rounded-2xl p-4"
           style={{
-            background: 'rgba(240,249,255,0.70)',
-            border: '1px solid rgba(6,182,212,0.10)',
+            background: 'var(--surface-muted)',
+            border: '1px solid var(--border)',
           }}
         >
           <div className="mb-3 flex items-center justify-between">
@@ -449,7 +458,7 @@ export function SwapScreen() {
               onClick={handleMax}
               disabled={!balanceIn || balIn}
               className="text-xs font-semibold disabled:opacity-40"
-              style={{ color: 'var(--accent-hover)' }}
+              style={{ color: 'var(--accent)' }}
             >
               Balance: {balIn ? '...' : (balanceIn ?? '0')} · Max
             </button>
@@ -459,7 +468,7 @@ export function SwapScreen() {
             <div className="flex-1">
               <input
                 inputMode="decimal"
-                className="display w-full bg-transparent text-3xl font-bold tabular-nums outline-none placeholder:text-slate-300"
+                className="display w-full bg-transparent text-3xl font-bold tabular-nums outline-none placeholder:text-slate-400"
                 style={{ color: 'var(--ink)' }}
                 placeholder="0.00"
                 value={amountIn}
@@ -483,8 +492,8 @@ export function SwapScreen() {
             disabled={busy}
             className="relative z-10 flex size-10 items-center justify-center rounded-2xl shadow-sm transition-all hover:scale-110 active:scale-95 disabled:opacity-40"
             style={{
-              background: 'rgba(255,255,255,0.90)',
-              border: '1px solid rgba(6,182,212,0.20)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
             }}
             aria-label="Flip swap direction"
           >
@@ -496,8 +505,8 @@ export function SwapScreen() {
         <div
           className="mt-2 rounded-2xl p-4"
           style={{
-            background: 'rgba(240,249,255,0.40)',
-            border: '1px solid rgba(6,182,212,0.08)',
+            background: 'var(--surface-muted)',
+            border: '1px solid var(--border)',
           }}
         >
           <div className="mb-3 flex items-center justify-between">
@@ -721,8 +730,8 @@ export function SwapScreen() {
             <div
               className="flex items-center justify-between rounded-2xl p-3.5"
               style={{
-                background: 'rgba(255,255,255,0.70)',
-                border: '1px solid rgba(18,45,69,0.08)',
+                background: 'var(--surface-muted)',
+                border: '1px solid var(--border)',
               }}
             >
               <div>
@@ -746,8 +755,8 @@ export function SwapScreen() {
             <div
               className="flex items-center justify-between rounded-2xl p-3.5"
               style={{
-                background: 'rgba(255,255,255,0.70)',
-                border: '1px solid rgba(18,45,69,0.08)',
+                background: 'var(--surface-muted)',
+                border: '1px solid var(--border)',
               }}
             >
               <div>
@@ -802,10 +811,10 @@ export function SwapScreen() {
           <label
             className="mt-3.5 flex cursor-pointer items-start gap-3 rounded-2xl p-3.5 transition-all"
             style={{
-              background: 'rgba(255,255,255,0.75)',
+              background: 'var(--surface-muted)',
               border: unlimitedApproval
                 ? '1px solid rgba(234,179,8,0.40)'
-                : '1px solid rgba(6,182,212,0.25)',
+                : '1px solid var(--border)',
             }}
           >
             <input
@@ -847,10 +856,10 @@ export function SwapScreen() {
           <div className="mt-5 flex gap-2.5">
             <button
               onClick={() => setShowConfirmSheet(false)}
-              className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:bg-black/5"
+              className="flex-1 rounded-2xl py-3.5 text-sm font-semibold transition-all hover:opacity-90"
               style={{
-                background: 'rgba(255,255,255,0.60)',
-                border: '1px solid rgba(18,45,69,0.12)',
+                background: 'var(--surface-muted)',
+                border: '1px solid var(--border)',
                 color: 'var(--ink)',
               }}
             >

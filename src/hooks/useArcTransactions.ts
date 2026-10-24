@@ -1,14 +1,12 @@
 /**
- * Fetch transaction history for an address on Arc Mainnet.
+ * Fetch transaction history for an address on the active Arc chain.
  * Parses USDC, EURC ERC-20 token transfers, and contract interactions.
- * Uses the Arc Mainnet block explorer API with fallback to local transaction store.
+ * Uses the chain block explorer API with fallback to local transaction store.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { requireChain } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
 import { TOKENS, TOKEN_BY_ADDRESS } from '../utils/tokens'
-
-const ARC_MAINNET_ID = 5042
+import { useNetwork, ARC_MAINNET_ID } from '../context/NetworkContext'
 
 // All tracked token addresses (lowercase)
 const TRACKED_ADDRESSES = new Set(TOKENS.map((t) => t.address.toLowerCase()))
@@ -117,11 +115,13 @@ function safeBigInt(v: unknown): bigint | undefined {
 /**
  * Persist transactions specifically and strictly for an address.
  * Transactions from different wallets are strictly separated.
+ * chainId=5042 (mainnet) uses the legacy key; testnet uses a prefixed key.
  */
-export function persistWalletTransactions(address: string, txs: ArcTransaction[]) {
+export function persistWalletTransactions(address: string, txs: ArcTransaction[], chainId = ARC_MAINNET_ID) {
   try {
     const addr = address.toLowerCase()
-    const key = `inter_wallet_txs_${addr}`
+    const prefix = chainId === ARC_MAINNET_ID ? '' : `testnet_`
+    const key = `inter_wallet_txs_${prefix}${addr}`
     const strictlyThisWallet = txs.filter((item) => {
       if (!item || !item.hash) return false
       const from = item.from?.toLowerCase()
@@ -138,16 +138,17 @@ export function persistWalletTransactions(address: string, txs: ArcTransaction[]
   }
 }
 
-export function recordTransaction(tx: ArcTransaction) {
+export function recordTransaction(tx: ArcTransaction, chainId = ARC_MAINNET_ID) {
   try {
     const sanitizedTx: ArcTransaction = {
       ...tx,
       value: sanitizeTxValue(tx.value, tx.rawValue),
     }
 
+    const prefix = chainId === ARC_MAINNET_ID ? '' : `testnet_`
     const saveForAddress = (addr: string) => {
       const cleanAddr = addr.toLowerCase()
-      const key = `inter_wallet_txs_${cleanAddr}`
+      const key = `inter_wallet_txs_${prefix}${cleanAddr}`
       let existing: ArcTransaction[] = []
       try {
         const stored = localStorage.getItem(key)
@@ -179,11 +180,12 @@ export function recordTransaction(tx: ArcTransaction) {
   }
 }
 
-export function getRecordedTransactions(address: string | undefined): ArcTransaction[] {
+export function getRecordedTransactions(address: string | undefined, chainId = ARC_MAINNET_ID): ArcTransaction[] {
   if (!address) return []
   try {
     const addr = address.toLowerCase()
-    const key = `inter_wallet_txs_${addr}`
+    const prefix = chainId === ARC_MAINNET_ID ? '' : `testnet_`
+    const key = `inter_wallet_txs_${prefix}${addr}`
     const txMap = new Map<string, ArcTransaction>()
 
     // 1. Read primary wallet storage
@@ -237,21 +239,21 @@ export function getRecordedTransactions(address: string | undefined): ArcTransac
 }
 
 export function useArcTransactions(address: `0x${string}` | undefined) {
-  const [transactions, setTransactions] = useState<ArcTransaction[]>(() => getRecordedTransactions(address))
+  const { chain, chainId } = useNetwork()
+  const [transactions, setTransactions] = useState<ArcTransaction[]>(() => getRecordedTransactions(address, chainId))
   const [isLoading, setIsLoading] = useState(false)
   const [isError, setIsError] = useState(false)
-  const chain = requireChain(ARC_MAINNET_ID)
 
   // Ref keeps track of rendered transactions to prevent race conditions & flicker
   const transactionsRef = useRef<ArcTransaction[]>(transactions)
 
-  // Sync state whenever address becomes available or changes
+  // Sync state whenever address or network changes
   useEffect(() => {
-    const local = getRecordedTransactions(address)
+    const local = getRecordedTransactions(address, chainId)
     /* oxlint-disable-next-line react/set-state-in-effect */
     setTransactions(local)
     transactionsRef.current = local
-  }, [address])
+  }, [address, chainId])
 
   useEffect(() => {
     transactionsRef.current = transactions
@@ -460,11 +462,11 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       .filter((t) => t.from?.toLowerCase() === addrLower || t.to?.toLowerCase() === addrLower)
       .sort((a, b) => b.timestamp - a.timestamp)
 
-    persistWalletTransactions(address, strictlyThisWallet)
+    persistWalletTransactions(address, strictlyThisWallet, chainId)
     setTransactions(strictlyThisWallet)
     transactionsRef.current = strictlyThisWallet
     setIsLoading(false)
-  }, [address, chain.explorerBase, chain.rpcUrls])
+  }, [address, chain.explorerBase, chain.rpcUrls, chainId])
 
   // Sync with block explorer API + listen for local recorded transactions
   /* oxlint-disable react/set-state-in-effect */

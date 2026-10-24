@@ -1,12 +1,13 @@
 /**
- * Estimate gas cost for an ERC-20 transfer on Arc Mainnet.
+ * Estimate gas cost for an ERC-20 transfer on the active Arc chain.
  * Works for any token (USDC, EURC, etc.).
  * Returns the fee in 6-decimal USDC display units (Arc native = USDC).
  */
 import { useEstimateGas, useGasPrice } from 'wagmi'
 import { erc20Abi, encodeFunctionData } from 'viem'
 import { Amount, gasTokenDecimalsFor, usdcDecimalsFor } from '@/onchain-money'
-import { ARC_MAINNET_ID, type TokenInfo } from '../utils/tokens'
+import { type TokenInfo } from '../utils/tokens'
+import { useNetwork } from '../context/NetworkContext'
 
 export function useTokenGasEstimate(
   token: TokenInfo,
@@ -14,7 +15,8 @@ export function useTokenGasEstimate(
   to: `0x${string}` | undefined,
   amount: bigint | undefined,
 ) {
-  const { data: gasPrice } = useGasPrice({ chainId: ARC_MAINNET_ID })
+  const { chainId } = useNetwork()
+  const { data: gasPrice } = useGasPrice({ chainId })
 
   const data =
     from && to && amount !== undefined
@@ -26,7 +28,7 @@ export function useTokenGasEstimate(
       : undefined
 
   const { data: gasEstimate } = useEstimateGas({
-    chainId: ARC_MAINNET_ID,
+    chainId,
     account: from,
     to: token.address,
     data,
@@ -37,11 +39,11 @@ export function useTokenGasEstimate(
     return { feeFormatted: '~0.001', feeAmount: undefined }
   }
 
-  // Arc native gas token IS USDC (18 dec) — convert to 6-dec display
+  // Arc native gas token IS USDC (18 dec) -- convert to 6-dec display
   const feeNative = Amount.fromRaw(
     gasPrice * gasEstimate,
-    gasTokenDecimalsFor(ARC_MAINNET_ID),
+    gasTokenDecimalsFor(chainId),
   )
-  const feeUsdc = feeNative.toDecimals(usdcDecimalsFor(ARC_MAINNET_ID), 'trunc')
+  const feeUsdc = feeNative.toDecimals(usdcDecimalsFor(chainId), 'trunc')
   return { feeFormatted: feeUsdc.toFixed(6), feeAmount: feeUsdc }
 }

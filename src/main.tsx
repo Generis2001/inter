@@ -26,6 +26,14 @@ import './index.css'
 
 const queryClient = new QueryClient()
 
+// Apply stored or system-preferred theme before React renders (prevents FOUC)
+if (typeof window !== 'undefined') {
+  const stored = localStorage.getItem('inter_theme')
+  const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  const theme = (stored === 'dark' || stored === 'light') ? stored : (prefersDark ? 'dark' : 'light')
+  document.documentElement.setAttribute('data-theme', theme)
+}
+
 // Auto-detect Chrome extension popup mode (under 500px in extension context)
 if (typeof window !== 'undefined') {
   const isExtension = window.location.protocol.includes('extension') || Boolean((window as unknown as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id)

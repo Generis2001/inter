@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { WalletProvider, useWallet } from './context/WalletContext'
+import { NetworkProvider } from './context/NetworkContext'
 import { LandingScreen } from './components/onboarding/LandingScreen'
 import { CreateMnemonicScreen } from './components/onboarding/CreateMnemonicScreen'
 import { VerifyMnemonicScreen } from './components/onboarding/VerifyMnemonicScreen'
@@ -23,7 +24,8 @@ import { useArcNSPrimaryName } from './hooks/useArcNSPrimaryName'
 import { InterLogo } from './components/shared/InterLogo'
 import { WalletIdenticon } from './components/shared/WalletIdenticon'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
-import { Bell, PanelRight } from 'lucide-react'
+import { Bell, PanelRight, Sun, Moon } from 'lucide-react'
+import { getInitialTheme, applyTheme, type Theme } from './utils/theme'
 
 // Inner component so it can access WalletContext
 function WalletApp() {
@@ -33,11 +35,21 @@ function WalletApp() {
   const [sendOpen, setSendOpen] = useState(false)
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+
+  // Apply theme on mount and whenever it changes
+  useEffect(() => {
+    applyTheme(theme)
+  }, [theme])
+
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  }, [])
 
   // Live transactions (fetched at app level so notifications work on every tab)
   const { transactions, isLoading: txLoading, isError: txError } = useArcTransactions(address)
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications(transactions)
-  // Resolve the user's primary ANS name for the header avatar tooltip
+  // Resolve the user primary ANS name for the header avatar tooltip
   const { primaryName } = useArcNSPrimaryName(address)
 
   const isUnlocked = screen === 'unlocked'
@@ -88,14 +100,14 @@ function WalletApp() {
 
   return (
     <div className="relative min-h-dvh">
-      {/* Global top bar — logo left, bell + avatar right */}
+      {/* Global top bar */}
       <header
         className="fixed left-0 right-0 top-0 z-30 flex items-center justify-between px-4 py-3"
         style={{
-          background: 'rgba(240,249,255,0.90)',
+          background: 'var(--header-bg)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderBottom: '1px solid rgba(6,182,212,0.12)',
+          borderBottom: '1px solid var(--header-border)',
         }}
       >
         {/* Logo + wordmark */}
@@ -109,8 +121,8 @@ function WalletApp() {
           </span>
         </div>
 
-        {/* Bell + Sidepanel + avatar */}
-        <div className="flex items-center gap-2">
+        {/* Controls: side panel + theme + bell + avatar */}
+        <div className="flex items-center gap-1.5">
           {/* Side panel toggle button for Chrome Extension */}
           {typeof window !== 'undefined' && Boolean((window as unknown as { chrome?: { runtime?: { id?: string } } }).chrome?.runtime?.id) && (
             <button
@@ -131,6 +143,38 @@ function WalletApp() {
             </button>
           )}
 
+          {/* Theme toggle */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center rounded-2xl p-2 transition-all hover:bg-black/5"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {theme === 'dark' ? (
+                <motion.span
+                  key="sun"
+                  initial={{ opacity: 0, rotate: -30, scale: 0.7 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: 30, scale: 0.7 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <Sun className="size-5" style={{ color: '#f59e0b' }} />
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="moon"
+                  initial={{ opacity: 0, rotate: 30, scale: 0.7 }}
+                  animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                  exit={{ opacity: 0, rotate: -30, scale: 0.7 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <Moon className="size-5" style={{ color: 'var(--muted)' }} />
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+
           {/* Notification bell */}
           <button
             onClick={() => setNotifOpen((v) => !v)}
@@ -148,7 +192,7 @@ function WalletApp() {
             )}
           </button>
 
-          {/* Wallet avatar — deterministic identicon from address */}
+          {/* Wallet avatar */}
           <button
             onClick={() => setActiveTab('settings')}
             className="flex items-center justify-center rounded-2xl transition-all hover:scale-[1.03] active:scale-[0.97]"
@@ -182,13 +226,7 @@ function WalletApp() {
       <div className="pt-14">
         <AnimatePresence mode="wait" initial={false}>
           {activeTab === 'home' && (
-            <motion.div
-              key="home"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Dashboard Error">
                 <DashboardScreen
                   onNavigate={handleNavigate}
@@ -201,69 +239,35 @@ function WalletApp() {
             </motion.div>
           )}
           {activeTab === 'activity' && (
-            <motion.div
-              key="activity"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div key="activity" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Activity Error">
-                <ActivityScreen
-                  transactions={transactions}
-                  isLoading={txLoading}
-                  isError={txError}
-                />
+                <ActivityScreen transactions={transactions} isLoading={txLoading} isError={txError} />
               </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'assets' && (
-            <motion.div
-              key="assets"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div key="assets" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Assets Error">
                 <AssetsScreen />
               </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'swap' && (
-            <motion.div
-              key="swap"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div key="swap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Swap Error">
                 <SwapScreen />
               </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'ans' && (
-            <motion.div
-              key="ans"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div key="ans" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="ArcNS Error">
                 <AnsScreen />
               </ErrorBoundary>
             </motion.div>
           )}
           {activeTab === 'settings' && (
-            <motion.div
-              key="settings"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
+            <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Settings Error">
                 <SettingsScreen />
               </ErrorBoundary>
@@ -288,9 +292,11 @@ function WalletApp() {
 export default function App() {
   return (
     <ErrorBoundary fallbackTitle="Inter Wallet Encountered an Issue">
-      <WalletProvider>
-        <WalletApp />
-      </WalletProvider>
+      <NetworkProvider>
+        <WalletProvider>
+          <WalletApp />
+        </WalletProvider>
+      </NetworkProvider>
     </ErrorBoundary>
   )
 }

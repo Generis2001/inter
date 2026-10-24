@@ -10,26 +10,26 @@ interface BottomNavProps {
 
 const TABS: { key: NavTab; icon: typeof Home; label: string }[] = [
   { key: 'home',     icon: Home,             label: 'Home'     },
-  { key: 'activity', icon: Activity,         label: 'Activity' },
   { key: 'swap',     icon: ArrowLeftRight,   label: 'Swap'     },
-  { key: 'ans',      icon: AtSign,           label: 'Names'    },
+  { key: 'activity', icon: Activity,         label: 'Activity' },
+  { key: 'ans',      icon: AtSign,           label: 'ANS'      },
   { key: 'settings', icon: Settings,         label: 'Settings' },
 ]
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex justify-center"
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
+      className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}
     >
       <div
-        className="mx-4 mb-3 flex w-full max-w-md items-center justify-around rounded-3xl px-2 py-2"
+        className="pointer-events-auto mx-4 mb-2 flex w-full max-w-md items-center justify-around rounded-3xl px-2.5 py-2 transition-all"
         style={{
-          background: 'rgba(255,255,255,0.90)',
-          backdropFilter: 'blur(40px) saturate(200%)',
-          WebkitBackdropFilter: 'blur(40px) saturate(200%)',
-          border: '1px solid rgba(6,182,212,0.14)',
-          boxShadow: '0 8px 32px rgba(6,182,212,0.10), inset 0 1px 0 rgba(255,255,255,0.65)',
+          background: 'var(--nav-bg)',
+          backdropFilter: 'blur(30px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(30px) saturate(180%)',
+          border: '1px solid var(--glass-border)',
+          boxShadow: 'var(--nav-shadow)',
         }}
       >
         {TABS.map(({ key, icon: Icon, label }) => {
@@ -38,23 +38,30 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
             <button
               key={key}
               onClick={() => onChange(key)}
-              className="relative flex min-w-[52px] flex-col items-center gap-1 rounded-2xl px-2 py-2 transition-all"
+              className="relative flex min-w-[56px] flex-col items-center gap-1 rounded-2xl py-1.5 transition-all active:scale-95"
             >
               {isActive && (
                 <motion.div
-                  layoutId="nav-pill"
+                  layoutId="meteor-nav-active-glow"
                   className="absolute inset-0 rounded-2xl"
-                  style={{ background: 'rgba(6,182,212,0.10)' }}
-                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                  style={{
+                    background: 'var(--accent-lighter)',
+                    border: '1px solid var(--accent-light)',
+                    opacity: 0.8,
+                  }}
+                  transition={{ type: 'spring', stiffness: 450, damping: 32 }}
                 />
               )}
               <Icon
-                className="relative z-10 size-5"
-                style={{ color: isActive ? 'var(--accent-light)' : 'var(--subtle)' }}
+                className="relative z-10 size-5 transition-transform duration-200"
+                style={{
+                  color: isActive ? 'var(--accent)' : 'var(--subtle)',
+                  transform: isActive ? 'scale(1.08)' : 'scale(1)',
+                }}
               />
               <span
-                className="relative z-10 text-xs font-semibold"
-                style={{ color: isActive ? 'var(--accent)' : 'var(--subtle)' }}
+                className="relative z-10 text-[11px] font-bold tracking-tight"
+                style={{ color: isActive ? 'var(--ink)' : 'var(--subtle)' }}
               >
                 {label}
               </span>

@@ -7,13 +7,12 @@ import { GlassCard } from '../shared/GlassCard'
 import { Skeleton } from '../shared/Skeleton'
 import { TokenIcon } from '../shared/TokenLogo'
 import { formatAddress } from '../../utils/wallet'
-import { buildTxExplorerUrl, buildAddressExplorerUrl, requireChain } from '@/onchain-facts'
+import { buildTxExplorerUrl, buildAddressExplorerUrl } from '@/onchain-facts'
 import { TOKENS, type TokenInfo } from '../../utils/tokens'
+import { useNetwork } from '../../context/NetworkContext'
 import { ArrowUpRight, ArrowDownLeft, Copy, Check, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
-
-const ARC_MAINNET_ID = 5042
 
 // ─── Asset Detail ─────────────────────────────────────────────────────────────
 
@@ -27,7 +26,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
   const { formatted, isLoading } = useTokenBalance(token, address)
   const { transactions, isLoading: txLoading } = useArcTransactions(address)
   const [copied, setCopied] = useState(false)
-  const chain = requireChain(ARC_MAINNET_ID)
+  const { chain, chainId } = useNetwork()
 
   const assetTxns: ArcTransaction[] = transactions
     .filter((tx) => tx.tokenSymbol === token.symbol && parseFloat(sanitizeTxValue(tx.value, tx.rawValue)) > 0)
@@ -117,7 +116,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
             <span className="text-xs" style={{ color: 'var(--muted)' }}>Contract</span>
             <div className="flex items-center gap-2">
               <a
-                href={buildAddressExplorerUrl(ARC_MAINNET_ID, token.address)}
+                href={buildAddressExplorerUrl(chainId, token.address)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mono text-xs font-semibold"
@@ -166,7 +165,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
                 return (
                   <a
                     key={tx.hash}
-                    href={buildTxExplorerUrl(ARC_MAINNET_ID, tx.hash)}
+                    href={buildTxExplorerUrl(chainId, tx.hash)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 rounded-2xl px-4 py-3 transition-all hover:bg-black/4"

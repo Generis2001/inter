@@ -1,14 +1,13 @@
 /**
- * Read USDC balance from Arc Mainnet ERC-20 (6 decimals).
+ * Read USDC balance from the active Arc chain's ERC-20 (6 decimals).
  * On Arc, native and USDC ERC-20 are ONE pool — we show ONLY the ERC-20 view.
+ * Network (mainnet / testnet) is read from NetworkContext.
  */
 import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { getUsdc, requireChain } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
-
-const ARC_MAINNET_ID = 5042
-const usdcFact = getUsdc(ARC_MAINNET_ID)!
+import { useNetwork } from '../context/NetworkContext'
 
 export interface ArcBalance {
   raw: bigint | undefined
@@ -20,12 +19,15 @@ export interface ArcBalance {
 }
 
 export function useArcBalance(address: `0x${string}` | undefined): ArcBalance {
+  const { chainId } = useNetwork()
+  const usdcFact = getUsdc(chainId) ?? getUsdc(5042)! // fallback to mainnet fact
+
   const { data, isLoading, isError, refetch } = useReadContract({
     address: usdcFact.address as `0x${string}`,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    chainId: ARC_MAINNET_ID,
+    chainId,
     query: {
       enabled: !!address,
       refetchInterval: 15_000,
@@ -56,5 +58,6 @@ export function useArcBalance(address: `0x${string}` | undefined): ArcBalance {
 }
 
 export function useArcChain() {
-  return requireChain(ARC_MAINNET_ID)
+  const { chainId } = useNetwork()
+  return requireChain(chainId)
 }
