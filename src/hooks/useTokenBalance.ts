@@ -5,7 +5,7 @@
 import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { Amount } from '@/onchain-money'
-import { type TokenInfo } from '../utils/tokens'
+import { getTokenAddress, type TokenInfo } from '../utils/tokens'
 import { useNetwork } from '../context/NetworkContext'
 
 export interface TokenBalance {
@@ -22,9 +22,10 @@ export function useTokenBalance(
   address: `0x${string}` | undefined,
 ): TokenBalance {
   const { chainId } = useNetwork()
+  const contractAddress = getTokenAddress(token.symbol, chainId)
 
   const { data, isLoading, isError, refetch } = useReadContract({
-    address: token.address,
+    address: contractAddress,
     abi: erc20Abi,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,

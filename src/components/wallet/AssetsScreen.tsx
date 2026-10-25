@@ -8,7 +8,7 @@ import { Skeleton } from '../shared/Skeleton'
 import { TokenIcon } from '../shared/TokenLogo'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl, buildAddressExplorerUrl } from '@/onchain-facts'
-import { TOKENS, type TokenInfo } from '../../utils/tokens'
+import { TOKENS, getTokenAddress, type TokenInfo } from '../../utils/tokens'
 import { useNetwork } from '../../context/NetworkContext'
 import { ArrowUpRight, ArrowDownLeft, Copy, Check, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
@@ -32,9 +32,11 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
     .filter((tx) => tx.tokenSymbol === token.symbol && parseFloat(sanitizeTxValue(tx.value, tx.rawValue)) > 0)
     .slice(0, 20)
 
+  const contractAddress = getTokenAddress(token.symbol, chainId)
+
   const handleCopyContract = async () => {
     try {
-      await navigator.clipboard.writeText(token.address)
+      await navigator.clipboard.writeText(contractAddress)
       setCopied(true)
       toast.success('Contract address copied')
       setTimeout(() => setCopied(false), 2000)
@@ -116,13 +118,13 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
             <span className="text-xs" style={{ color: 'var(--muted)' }}>Contract</span>
             <div className="flex items-center gap-2">
               <a
-                href={buildAddressExplorerUrl(chainId, token.address)}
+                href={buildAddressExplorerUrl(chainId, contractAddress)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mono text-xs font-semibold"
                 style={{ color: 'var(--accent-hover)' }}
               >
-                {formatAddress(token.address)}
+                {formatAddress(contractAddress)}
               </a>
               <button onClick={() => { void handleCopyContract() }} style={{ color: 'var(--subtle)' }}>
                 {copied
@@ -257,6 +259,7 @@ function AssetRow({
 
 export function AssetsScreen() {
   const { account } = useWallet()
+  const { isTestnet } = useNetwork()
   const address = account?.address
   const [activeToken, setActiveToken] = useState<TokenInfo | null>(null)
 
@@ -281,7 +284,7 @@ export function AssetsScreen() {
             Assets
           </h1>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--subtle)' }}>
-            Your balances on Arc Mainnet
+            Your balances on {isTestnet ? 'Arc Testnet' : 'Arc Mainnet'}
           </p>
         </div>
 

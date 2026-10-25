@@ -17,14 +17,21 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
   const { chainId } = useNetwork()
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
-  const isTower = isContract && (tx.contractName ?? '').toLowerCase().includes('tower')
-  const isSwap = tx.txType === 'swap'
+  const isTower = (tx.contractName ?? '').toLowerCase().includes('tower')
+  const isSwap =
+    tx.txType === 'swap' ||
+    isTower ||
+    (tx.contractName ?? '').toLowerCase().includes('uniswap') ||
+    (tx.contractName ?? '').toLowerCase().includes('dex') ||
+    (tx.method ?? '').toLowerCase().includes('swap')
   const symbol = (tx.tokenSymbol === 'EURC' ? 'EURC' : 'USDC')
   const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
 
-  const title = isContract
-    ? (tx.method ?? tx.contractName ?? 'Contract Interaction')
-    : (isSent ? 'Sent' : 'Received')
+  const title = isSwap
+    ? 'Swap'
+    : isContract
+      ? (tx.method ?? tx.contractName ?? 'Contract Interaction')
+      : (isSent ? 'Sent' : 'Received')
 
   const subtitle = isContract
     ? (tx.contractName ? `${tx.contractName} · ${tx.to ? formatAddress(tx.to) : 'Contract'}` : (tx.to ? formatAddress(tx.to) : 'Contract'))
@@ -35,7 +42,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
       href={buildTxExplorerUrl(chainId, tx.hash)}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-black/4"
+      className="flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-black/4 dark:hover:bg-white/4"
     >
       {/* Direction or Contract icon with token logo overlay */}
       <div className="relative mt-0.5 shrink-0">
@@ -44,15 +51,19 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
           style={{
             background: tx.status === 'failed'
               ? 'rgba(186,43,76,0.10)'
-              : isContract
-                ? 'rgba(6,182,212,0.14)'
-                : isSent ? 'rgba(18,45,69,0.08)' : 'rgba(26,128,71,0.10)',
+              : isSwap
+                ? 'rgba(0,194,255,0.14)'
+                : isContract
+                  ? 'rgba(6,182,212,0.14)'
+                  : isSent ? 'rgba(18,45,69,0.08)' : 'rgba(26,128,71,0.10)',
           }}
         >
           {tx.status === 'failed' ? (
             <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
-          ) : isContract && isTower ? (
+          ) : isTower ? (
             <TowerLogo size={16} />
+          ) : isSwap ? (
+            <ArrowUpRight className="size-4" style={{ color: 'var(--accent)' }} />
           ) : isContract ? (
             <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
           ) : isSent ? (
@@ -61,8 +72,8 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
             <ArrowDownLeft className="size-4" style={{ color: 'var(--success)' }} />
           )}
         </div>
-        <div className="absolute -bottom-1 -right-1 rounded-full border border-white">
-          <TokenIcon symbol={symbol} size={14} />
+        <div className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
+          <TokenIcon symbol={symbol} size={12} />
         </div>
       </div>
 

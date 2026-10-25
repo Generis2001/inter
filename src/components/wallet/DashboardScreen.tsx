@@ -298,11 +298,11 @@ export function DashboardScreen({
               }}
             >
               <TrendingUp className="size-3.5" />
-              <span>Arc Native Yield · Instant Transfers</span>
+              <span>StablEcoin native</span>
             </div>
 
-            {/* Meteor 4-Action Circular Hub */}
-            <div className="mt-6 grid w-full grid-cols-4 gap-2 pt-2">
+            {/* Quick Action Hub: Send, Receive, History */}
+            <div className="mt-6 grid w-full max-w-xs grid-cols-3 gap-3 pt-2 mx-auto">
               {/* 1. Send */}
               <button
                 onClick={onShowSend}
@@ -342,27 +342,7 @@ export function DashboardScreen({
                 </span>
               </button>
 
-              {/* 3. Swap */}
-              <button
-                onClick={() => onNavigate('swap')}
-                className="group flex flex-col items-center gap-1.5 transition-all"
-              >
-                <div
-                  className="flex size-13 items-center justify-center rounded-2xl transition-all duration-200 group-hover:scale-105 group-active:scale-95 shadow-sm"
-                  style={{
-                    background: 'var(--surface-muted)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--ink)',
-                  }}
-                >
-                  <ArrowLeftRight className="size-5 transition-transform group-hover:rotate-45" style={{ color: 'var(--accent)' }} />
-                </div>
-                <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                  Swap
-                </span>
-              </button>
-
-              {/* 4. Activity */}
+              {/* 3. History */}
               <button
                 onClick={() => onNavigate('activity')}
                 className="group flex flex-col items-center gap-1.5 transition-all"

@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useWallet } from '../../context/WalletContext'
 import { BottomSheet } from '../shared/BottomSheet'
 import { TokenIcon } from '../shared/TokenLogo'
-import { TOKENS, type TokenInfo } from '../../utils/tokens'
+import { TOKENS, getTokenAddress, type TokenInfo } from '../../utils/tokens'
+import { useNetwork } from '../../context/NetworkContext'
 import { Copy, Check, Share2, AlertTriangle, ChevronDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,9 +16,11 @@ interface ReceiveSheetProps {
 
 export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
   const { account } = useWallet()
+  const { isTestnet, chainId } = useNetwork()
   const address = account?.address ?? ''
   const [copied, setCopied] = useState(false)
   const [selectedToken, setSelectedToken] = useState<TokenInfo>(TOKENS[0])
+  const tokenContractAddress = getTokenAddress(selectedToken.symbol, chainId)
   const [showPicker, setShowPicker] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -137,6 +140,22 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
         <p className="mono mt-1 break-all text-center text-xs" style={{ color: 'var(--muted)' }}>
           {address}
         </p>
+        <div className="mt-2.5 flex items-center gap-2">
+          <span className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold"
+            style={{ background: 'var(--surface-muted)', color: 'var(--subtle)', border: '1px solid var(--border)' }}>
+            {isTestnet ? 'Arc Testnet' : 'Arc Mainnet'}
+          </span>
+          <button
+            onClick={async () => {
+              await navigator.clipboard.writeText(tokenContractAddress)
+              toast.success(`${selectedToken.symbol} contract address copied`)
+            }}
+            className="rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all hover:opacity-80"
+            style={{ background: 'var(--surface-muted)', color: 'var(--accent)', border: '1px solid var(--border)' }}
+          >
+            Copy {selectedToken.symbol} Contract
+          </button>
+        </div>
       </div>
 
       {/* Action buttons */}
@@ -168,7 +187,7 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
         style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)' }}>
         <AlertTriangle className="mt-0.5 size-4 shrink-0" style={{ color: 'var(--subtle)' }} />
         <p className="text-xs" style={{ color: 'var(--muted)' }}>
-          Only send <strong>{selectedToken.symbol}</strong> on the <strong>Arc</strong> network to this address. Sending assets from other networks may result in permanent loss.
+          Only send <strong>{selectedToken.symbol}</strong> on the <strong>{isTestnet ? 'Arc Testnet' : 'Arc Mainnet'}</strong> network to this address. Sending assets from other networks may result in permanent loss.
         </p>
       </div>
     </BottomSheet>

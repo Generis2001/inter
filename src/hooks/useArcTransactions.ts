@@ -5,11 +5,15 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Amount } from '@/onchain-money'
-import { TOKENS, TOKEN_BY_ADDRESS } from '../utils/tokens'
+import { TOKENS, TOKEN_BY_ADDRESS, EURC_TESTNET_ADDRESS, EURC_MAINNET_ADDRESS } from '../utils/tokens'
 import { useNetwork, ARC_MAINNET_ID } from '../context/NetworkContext'
 
 // All tracked token addresses (lowercase)
-const TRACKED_ADDRESSES = new Set(TOKENS.map((t) => t.address.toLowerCase()))
+const TRACKED_ADDRESSES = new Set([
+  ...TOKENS.map((t) => t.address.toLowerCase()),
+  EURC_TESTNET_ADDRESS.toLowerCase(),
+  EURC_MAINNET_ADDRESS.toLowerCase(),
+])
 
 export interface ArcTransaction {
   hash: string
@@ -54,7 +58,8 @@ const KNOWN_CONTRACTS: Record<string, { name: string; type: 'swap' | 'approval' 
   '0x000000000022d473030f116ddee9f6b43ac78ba3': { name: 'Permit2', type: 'approval' },
   '0x32b5fece16ff4619e4233772f4477ce177a1371b': { name: 'Inter Name Registry', type: 'contract' },
   '0x3600000000000000000000000000000000000000': { name: 'USDC Contract', type: 'contract' },
-  '0xeb9898e903126fa400e88029584aac4b14dd8b37': { name: 'EURC Contract', type: 'contract' },
+  '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1': { name: 'EURC Contract', type: 'contract' },
+  '0x89b50855aa3be2f677cd6303cec089b5f319d72a': { name: 'EURC Contract', type: 'contract' },
 }
 
 export function formatTransactionValue(
@@ -68,7 +73,7 @@ export function formatTransactionValue(
 
   const addr = tokenAddress?.toLowerCase() ?? ''
   const isErc20Usdc = addr === '0x3600000000000000000000000000000000000000'
-  const isErc20Eurc = addr === '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1'
+  const isErc20Eurc = addr === '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1' || addr === '0x89b50855aa3be2f677cd6303cec089b5f319d72a'
 
   let decimals = explicitDecimals ?? 6
   if (!explicitDecimals) {
@@ -320,6 +325,12 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
           let direction: ArcTransaction['direction'] = 'contract'
           let txType: ArcTransaction['txType'] = 'contract'
 
+          const isDexAddress =
+            toLower === '0xeb8940752fa12944d3b2d736d51fa36e4da32bc8' ||
+            from === '0xeb8940752fa12944d3b2d736d51fa36e4da32bc8' ||
+            toLower === '0x8702463e73f74d0b6765abceb314ef07acb92650' ||
+            from === '0x8702463e73f74d0b6765abceb314ef07acb92650'
+
           if (isContractCall) {
             direction = 'contract'
             if (isKnownContract) {
@@ -331,13 +342,20 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
             }
           } else if (from === addrLower) {
             direction = 'sent'
-            txType = 'transfer'
+            txType = isDexAddress ? 'swap' : 'transfer'
           } else if (to === addrLower) {
             direction = 'received'
-            txType = 'transfer'
+            txType = isDexAddress ? 'swap' : 'transfer'
           }
 
-          const contractName = tx.to?.name ?? KNOWN_CONTRACTS[toLower]?.name ?? (isContractCall ? 'Contract' : undefined)
+          if (isDexAddress) {
+            txType = 'swap'
+          }
+
+          const contractName =
+            tx.to?.name ??
+            KNOWN_CONTRACTS[toLower]?.name ??
+            (isDexAddress ? 'Tower DEX Router' : isContractCall ? 'Contract' : undefined)
           const method = tx.method ?? (isKnownContract ? KNOWN_CONTRACTS[toLower].name : undefined)
 
           return {

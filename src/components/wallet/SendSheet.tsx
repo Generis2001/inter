@@ -13,7 +13,7 @@ import { TokenIcon } from '../shared/TokenLogo'
 import { isValidAddress, parseOnchainError } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
-import { TOKENS, type TokenInfo } from '../../utils/tokens'
+import { TOKENS, getTokenAddress, type TokenInfo } from '../../utils/tokens'
 import { recordTransaction } from '../../hooks/useArcTransactions'
 
 import { createWalletClient, createPublicClient, http, erc20Abi } from 'viem'
@@ -238,9 +238,10 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
       const walletClient = createWalletClient({ account: viemAcct, chain: viemChain, transport: http() })
       const publicClient = createPublicClient({ chain: viemChain, transport: http() })
 
+      const tokenContractAddress = getTokenAddress(selectedToken.symbol, chainId)
       const hash = await walletClient.writeContract({
         account: viemAcct,
-        address: selectedToken.address,
+        address: tokenContractAddress,
         abi: erc20Abi,
         functionName: 'transfer',
         args: [finalAddress, parsedAmount.raw],

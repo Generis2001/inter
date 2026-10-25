@@ -6,7 +6,7 @@
 import { useEstimateGas, useGasPrice } from 'wagmi'
 import { erc20Abi, encodeFunctionData } from 'viem'
 import { Amount, gasTokenDecimalsFor, usdcDecimalsFor } from '@/onchain-money'
-import { type TokenInfo } from '../utils/tokens'
+import { getTokenAddress, type TokenInfo } from '../utils/tokens'
 import { useNetwork } from '../context/NetworkContext'
 
 export function useTokenGasEstimate(
@@ -16,6 +16,7 @@ export function useTokenGasEstimate(
   amount: bigint | undefined,
 ) {
   const { chainId } = useNetwork()
+  const tokenContractAddress = getTokenAddress(token.symbol, chainId)
   const { data: gasPrice } = useGasPrice({ chainId })
 
   const data =
@@ -30,7 +31,7 @@ export function useTokenGasEstimate(
   const { data: gasEstimate } = useEstimateGas({
     chainId,
     account: from,
-    to: token.address,
+    to: tokenContractAddress,
     data,
     query: { enabled: !!from && !!to && amount !== undefined },
   })
