@@ -22,13 +22,13 @@ export interface EncryptedPayload {
 
 const VAULT_STORAGE_KEY = 'inter_wallet_vault_v1'
 
-function bufferToHex(buf: ArrayBuffer): string {
+function bufferToHex(buf: ArrayBuffer | Uint8Array<ArrayBuffer>): string {
   return Array.from(new Uint8Array(buf))
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
 }
 
-function hexToBuffer(hex: string): Uint8Array {
+function hexToBuffer(hex: string): Uint8Array<ArrayBuffer> {
   const bytes = new Uint8Array(hex.length / 2)
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.slice(i, i + 2), 16)
@@ -36,7 +36,7 @@ function hexToBuffer(hex: string): Uint8Array {
   return bytes
 }
 
-async function deriveKey(pinOrPassword: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(pinOrPassword: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const enc = new TextEncoder()
   const keyMaterial = await window.crypto.subtle.importKey(
     'raw',

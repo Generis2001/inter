@@ -146,9 +146,8 @@ export function ReceiveSheet({ open, onClose }: ReceiveSheetProps) {
             {isTestnet ? 'Arc Testnet' : 'Arc Mainnet'}
           </span>
           <button
-            onClick={async () => {
-              await navigator.clipboard.writeText(tokenContractAddress)
-              toast.success(`${selectedToken.symbol} contract address copied`)
+            onClick={() => {
+              void navigator.clipboard.writeText(tokenContractAddress).then(() => toast.success(`${selectedToken.symbol} contract address copied`)).catch(() => toast.error('Copy failed'))
             }}
             className="rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-all hover:opacity-80"
             style={{ background: 'var(--surface-muted)', color: 'var(--accent)', border: '1px solid var(--border)' }}

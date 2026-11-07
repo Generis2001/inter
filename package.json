@@ -13,11 +13,13 @@
     "deploy:self": "bun run ./scripts/self-deploy.ts",
     "compass:deploy": "bun run ./scripts/compass-deploy.ts",
     "fetch:abi": "bun run ./scripts/fetch-abi.ts",
-    "lint": "oxlint --type-aware src scripts --fix; s=$?; oxlint --fix .; exit $((s>0?s:$?))",
+    "lint": "oxlint --type-aware src scripts --ignore-pattern \"**/*.js\" --ignore-pattern \"**/*.cjs\" --ignore-pattern \"**/*.mjs\" --fix && oxlint --fix .",
     "typecheck": "tsc --noEmit",
     "check": "bash scripts/check.sh",
     "contracts:build": "forge build",
-    "contracts:test": "forge test"
+    "contracts:test": "forge test",
+    "tower:serve": "node --env-file=.env server/start.mjs",
+    "test:bridge": "node scripts/test-bridge.mjs && node --test tests/tower-proxy.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",

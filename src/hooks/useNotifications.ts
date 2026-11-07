@@ -17,9 +17,11 @@ export interface WalletNotification {
   timestamp: number
   txHash: string
   read: boolean
+  scope: string
+  chainId?: number
 }
 
-export function useNotifications(transactions: ArcTransaction[]) {
+export function useNotifications(transactions: ArcTransaction[], scope: string) {
   const [notifications, setNotifications] = useState<WalletNotification[]>([])
   // Track the hashes we've already ingested so we don't duplicate on re-poll
   const seenHashes = useRef<Set<string>>(new Set())
@@ -31,18 +33,21 @@ export function useNotifications(transactions: ArcTransaction[]) {
     const newItems: WalletNotification[] = []
 
     for (const tx of transactions) {
-      if (seenHashes.current.has(tx.hash)) continue
-      seenHashes.current.add(tx.hash)
+      const identity = `${scope}:${tx.hash}:${tx.status}`
+      if (seenHashes.current.has(identity)) continue
+      seenHashes.current.add(identity)
 
       // Only surface received and failed transactions as push-style notifications
-      if (tx.direction === 'received' || tx.status === 'failed') {
+      if ((tx.direction === 'received' && tx.status === 'success') || tx.status === 'failed') {
         const type: WalletNotification['type'] =
           tx.direction === 'received'
             ? 'received'
             : 'failed'
 
         newItems.push({
-          id: tx.hash,
+          id: identity,
+          scope,
+          chainId: tx.chainId,
           type,
           tokenSymbol: tx.tokenSymbol,
           value: tx.value,
@@ -58,15 +63,15 @@ export function useNotifications(transactions: ArcTransaction[]) {
     if (newItems.length > 0) {
       setNotifications((prev) => {
         // Newest first, cap at 50
-        const merged = [...newItems, ...prev].slice(0, 50)
+        const merged = [...newItems, ...prev.filter(n => n.scope === scope)].slice(0, 50)
         return merged
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transactions])
+  }, [transactions, scope, lastReadAt])
 
   const unreadCount = notifications.filter(
-    (n) => n.timestamp > lastReadAt,
+    (n) => n.scope === scope && n.timestamp > lastReadAt,
   ).length
 
   const markAllRead = useCallback(() => {
@@ -80,5 +85,5 @@ export function useNotifications(transactions: ArcTransaction[]) {
     seenHashes.current.clear()
   }, [])
 
-  return { notifications, unreadCount, markAllRead, clearAll }
+  return { notifications: notifications.filter(n => n.scope === scope), unreadCount, markAllRead, clearAll }
 }

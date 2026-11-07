@@ -3,10 +3,10 @@
  * Parses USDC, EURC ERC-20 token transfers, and contract interactions.
  * Uses the chain block explorer API with fallback to local transaction store.
  */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { Amount } from '@/onchain-money'
 import { TOKENS, TOKEN_BY_ADDRESS, EURC_TESTNET_ADDRESS, EURC_MAINNET_ADDRESS } from '../utils/tokens'
-import { useNetwork, ARC_MAINNET_ID } from '../context/NetworkContext'
+import { useNetwork } from '../context/NetworkContext'
 
 // All tracked token addresses (lowercase)
 const TRACKED_ADDRESSES = new Set([
@@ -15,21 +15,15 @@ const TRACKED_ADDRESSES = new Set([
   EURC_MAINNET_ADDRESS.toLowerCase(),
 ])
 
-export interface ArcTransaction {
-  hash: string
-  from: `0x${string}`
-  to: `0x${string}` | null
-  value: string       // formatted token amount
-  rawValue: bigint
-  tokenSymbol: string // 'USDC' | 'EURC' | 'native' | 'TOKEN'
-  timestamp: number
-  status: 'success' | 'failed' | 'pending'
-  direction: 'sent' | 'received' | 'contract'
-  blockNumber: bigint | null
-  gasUsed: string
-  contractName?: string
-  method?: string
-  txType?: 'swap' | 'approval' | 'contract' | 'transfer'
+import { getRecordedTransactions, persistWalletTransactions, type ArcTransaction } from '../utils/transactionHistory'
+export { recordTransaction, getRecordedTransactions, persistWalletTransactions, type ArcTransaction } from '../utils/transactionHistory'
+
+interface RpcLog {
+  address: string
+  data: string
+  topics: string[]
+  transactionHash: string
+  blockNumber: string
 }
 
 interface ExplorerTx {
@@ -105,147 +99,13 @@ export function sanitizeTxValue(valStr: string, rawVal?: bigint): string {
   return valStr || '0.00'
 }
 
-function safeBigInt(v: unknown): bigint | undefined {
-  if (typeof v === 'bigint') return v
-  if (typeof v === 'number' && !isNaN(v)) return BigInt(Math.floor(v))
-  if (typeof v === 'string' && /^-?\d+$/.test(v.trim())) {
-    try { return BigInt(v.trim()) } catch { return undefined }
-  }
-  if (typeof v === 'string' && /^0x[0-9a-fA-F]+$/.test(v.trim())) {
-    try { return BigInt(v.trim()) } catch { return undefined }
-  }
-  return undefined
-}
-
-/**
- * Persist transactions specifically and strictly for an address.
- * Transactions from different wallets are strictly separated.
- * chainId=5042 (mainnet) uses the legacy key; testnet uses a prefixed key.
- */
-export function persistWalletTransactions(address: string, txs: ArcTransaction[], chainId = ARC_MAINNET_ID) {
-  try {
-    const addr = address.toLowerCase()
-    const prefix = chainId === ARC_MAINNET_ID ? '' : `testnet_`
-    const key = `inter_wallet_txs_${prefix}${addr}`
-    const strictlyThisWallet = txs.filter((item) => {
-      if (!item || !item.hash) return false
-      const from = item.from?.toLowerCase()
-      const to = item.to?.toLowerCase()
-      return from === addr || to === addr
-    }).slice(0, 100)
-
-    localStorage.setItem(
-      key,
-      JSON.stringify(strictlyThisWallet, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
-    )
-  } catch {
-    // local storage unavailable
-  }
-}
-
-export function recordTransaction(tx: ArcTransaction, chainId = ARC_MAINNET_ID) {
-  try {
-    const sanitizedTx: ArcTransaction = {
-      ...tx,
-      value: sanitizeTxValue(tx.value, tx.rawValue),
-    }
-
-    const prefix = chainId === ARC_MAINNET_ID ? '' : `testnet_`
-    const saveForAddress = (addr: string) => {
-      const cleanAddr = addr.toLowerCase()
-      const key = `inter_wallet_txs_${prefix}${cleanAddr}`
-      let existing: ArcTransaction[] = []
-      try {
-        const stored = localStorage.getItem(key)
-        if (stored) {
-          const parsed = JSON.parse(stored)
-          if (Array.isArray(parsed)) existing = parsed
-        }
-      } catch {}
-
-      const updated = [
-        sanitizedTx,
-        ...existing.filter((item) => item.hash?.toLowerCase() !== sanitizedTx.hash?.toLowerCase()),
-      ].slice(0, 100)
-
-      localStorage.setItem(
-        key,
-        JSON.stringify(updated, (_k, v) => (typeof v === 'bigint' ? v.toString() : v)),
-      )
-    }
-
-    if (sanitizedTx.from) saveForAddress(sanitizedTx.from)
-    if (sanitizedTx.to && sanitizedTx.to.toLowerCase() !== sanitizedTx.from?.toLowerCase()) {
-      saveForAddress(sanitizedTx.to)
-    }
-
-    window.dispatchEvent(new CustomEvent('inter_tx_recorded', { detail: sanitizedTx }))
-  } catch {
-    // local storage unavailable
-  }
-}
-
-export function getRecordedTransactions(address: string | undefined, chainId = ARC_MAINNET_ID): ArcTransaction[] {
-  if (!address) return []
-  try {
-    const addr = address.toLowerCase()
-    const prefix = chainId === ARC_MAINNET_ID ? '' : `testnet_`
-    const key = `inter_wallet_txs_${prefix}${addr}`
-    const txMap = new Map<string, ArcTransaction>()
-
-    // 1. Read primary wallet storage
-    const stored = localStorage.getItem(key)
-    if (stored) {
-      try {
-        const list: ArcTransaction[] = JSON.parse(stored)
-        if (Array.isArray(list)) {
-          for (const item of list) {
-            if (item && item.hash) {
-              const from = item.from?.toLowerCase()
-              const to = item.to?.toLowerCase()
-              if (from === addr || to === addr) {
-                item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
-                txMap.set(item.hash.toLowerCase(), item)
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-
-    // 2. Also check legacy address key if present for smooth backward compatibility
-    const legacyKey = `inter_tx_history_${addr}`
-    const legacyStored = localStorage.getItem(legacyKey)
-    if (legacyStored) {
-      try {
-        const list: ArcTransaction[] = JSON.parse(legacyStored)
-        if (Array.isArray(list)) {
-          for (const item of list) {
-            if (item && item.hash) {
-              const from = item.from?.toLowerCase()
-              const to = item.to?.toLowerCase()
-              if (from === addr || to === addr) {
-                const hashKey = item.hash.toLowerCase()
-                if (!txMap.has(hashKey)) {
-                  item.value = sanitizeTxValue(item.value, safeBigInt(item.rawValue))
-                  txMap.set(hashKey, item)
-                }
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-
-    return Array.from(txMap.values()).sort((a, b) => b.timestamp - a.timestamp)
-  } catch {
-    return []
-  }
-}
-
 export function useArcTransactions(address: `0x${string}` | undefined) {
   const { chain, chainId } = useNetwork()
-  const [transactions, setTransactions] = useState<ArcTransaction[]>(() => getRecordedTransactions(address, chainId))
+  const scope = `${chainId}:${address?.toLowerCase() ?? ''}`
+  const activeScope = useRef(scope)
+  useLayoutEffect(() => { activeScope.current = scope }, [scope])
+  const [snapshot, setSnapshot] = useState(() => ({ scope, transactions: getRecordedTransactions(address, chainId) }))
+  const transactions = snapshot.scope === scope ? snapshot.transactions : getRecordedTransactions(address, chainId)
   const [isLoading, setIsLoading] = useState(false)
   const [isError, setIsError] = useState(false)
 
@@ -256,9 +116,9 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
   useEffect(() => {
     const local = getRecordedTransactions(address, chainId)
     /* oxlint-disable-next-line react/set-state-in-effect */
-    setTransactions(local)
+    setSnapshot({ scope, transactions: local })
     transactionsRef.current = local
-  }, [address, chainId])
+  }, [address, chainId, scope])
 
   useEffect(() => {
     transactionsRef.current = transactions
@@ -266,6 +126,8 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
 
   const fetchTxns = useCallback(async () => {
     if (!address) return
+    const requestScope = scope
+    const isCurrent = () => activeScope.current === requestScope
 
     // CRITICAL: Only flash loading skeletons if we don't have any cached transactions.
     // Background polling while transactions are rendered will NEVER flicker or hide history.
@@ -275,7 +137,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
     setIsError(false)
 
     const addrLower = address.toLowerCase()
-    const freshLocal = getRecordedTransactions(address)
+    const freshLocal = getRecordedTransactions(address, chainId)
     const freshLocalMap = new Map<string, ArcTransaction>()
     for (const t of freshLocal) freshLocalMap.set(t.hash.toLowerCase(), t)
 
@@ -315,7 +177,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
           }
 
           const from = tx.from.hash.toLowerCase() as `0x${string}`
-          const to = tx.to?.hash?.toLowerCase() as `0x${string}` | null
+          const to = (tx.to?.hash?.toLowerCase() ?? null) as `0x${string}` | null
           const addrLower = address.toLowerCase()
           const toLower = to ?? ''
 
@@ -357,6 +219,10 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
             KNOWN_CONTRACTS[toLower]?.name ??
             (isDexAddress ? 'Tower DEX Router' : isContractCall ? 'Contract' : undefined)
           const method = tx.method ?? (isKnownContract ? KNOWN_CONTRACTS[toLower].name : undefined)
+          if (trackedTransfer && /^transfer/i.test(tx.method ?? '')) {
+            direction = trackedTransfer.from.hash.toLowerCase() === addrLower ? 'sent' : 'received'
+            txType = 'transfer'
+          }
 
           return {
             hash: tx.hash,
@@ -366,7 +232,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
             rawValue,
             tokenSymbol,
             timestamp: tx.timestamp ? new Date(tx.timestamp).getTime() : Date.now(),
-            status: (tx.status === '1' || tx.status === 'ok' ? 'success' : tx.status === '0' ? 'failed' : 'pending') as ArcTransaction['status'],
+            status: (tx.status === '1' || tx.status === 'ok' ? 'success' : tx.status === '0' ? 'failed' : 'pending'),
             direction,
             blockNumber: tx.block !== null ? BigInt(tx.block) : null,
             gasUsed: tx.gas_used ?? '0',
@@ -380,6 +246,8 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       // Explorer API unavailable or CORS/Cloudflare protected — gracefully continue with local & RPC
     }
 
+    if (!isCurrent()) return
+
     // 2. Try Arc RPC getLogs for past blocks to catch onchain ERC-20 transfers
     try {
       const rpc = chain.rpcUrls[0]
@@ -390,7 +258,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
         })
-        const blockNumHex = (await blockRes.json()).result
+        const blockNumHex = ((await blockRes.json()) as { result?: string }).result ?? '0x0'
         const blockNum = parseInt(blockNumHex, 16)
         if (blockNum > 0) {
           const fromBlock = '0x' + Math.max(0, blockNum - 2500).toString(16)
@@ -417,12 +285,14 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
               }),
             }),
           ])
-          const sentLogs = (await sentRes.json()).result ?? []
-          const recvLogs = (await recvRes.json()).result ?? []
+          const sentLogs = ((await sentRes.json()) as { result?: RpcLog[] }).result ?? []
+          const recvLogs = ((await recvRes.json()) as { result?: RpcLog[] }).result ?? []
           const allLogs = [...sentLogs, ...recvLogs]
 
           for (const log of allLogs) {
+            if (log.topics.length < 3) continue
             const tokenAddr = log.address.toLowerCase()
+            if (!TRACKED_ADDRESSES.has(tokenAddr)) continue
             const tokenInfo = TOKEN_BY_ADDRESS[tokenAddr] ?? TOKENS[0]
             const rawVal = BigInt(log.data === '0x' ? '0' : log.data)
             const fromAddr = ('0x' + log.topics[1].slice(26)).toLowerCase() as `0x${string}`
@@ -454,10 +324,12 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       // RPC getLogs fallback failed — local store will serve data
     }
 
+    if (!isCurrent()) return
+
     // Merge parsed explorer/RPC txns with all recorded local transactions
     const txMap = new Map<string, ArcTransaction>()
 
-    for (const t of freshLocal) txMap.set(t.hash.toLowerCase(), t)
+    for (const t of getRecordedTransactions(address, chainId)) txMap.set(t.hash.toLowerCase(), t)
     for (const t of parsed) {
       const key = t.hash.toLowerCase()
       if (!txMap.has(key)) {
@@ -467,7 +339,8 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
         txMap.set(key, {
           ...existing,
           ...t,
-          status: existing.status === 'success' ? 'success' : t.status,
+          status: existing.txType === 'bridge' ? existing.status : t.status,
+          chainId,
           contractName: existing.contractName ?? t.contractName,
           method: existing.method ?? t.method,
           txType: existing.txType ?? t.txType,
@@ -477,20 +350,23 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
 
     // STRICT wallet isolation: only keep transactions belonging to this address
     const strictlyThisWallet = Array.from(txMap.values())
+      .map(t => ({ ...t, chainId }))
       .filter((t) => t.from?.toLowerCase() === addrLower || t.to?.toLowerCase() === addrLower)
       .sort((a, b) => b.timestamp - a.timestamp)
 
     persistWalletTransactions(address, strictlyThisWallet, chainId)
-    setTransactions(strictlyThisWallet)
+    setSnapshot({ scope: requestScope, transactions: strictlyThisWallet })
     transactionsRef.current = strictlyThisWallet
     setIsLoading(false)
-  }, [address, chain.explorerBase, chain.rpcUrls, chainId])
+  }, [address, chain.explorerBase, chain.rpcUrls, chainId, scope])
 
   // Sync with block explorer API + listen for local recorded transactions
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
     void fetchTxns()
-    const handleRecorded = () => { void fetchTxns() }
+    const handleRecorded = (event: Event) => {
+      if ((event as CustomEvent<ArcTransaction>).detail?.chainId === chainId) void fetchTxns()
+    }
     window.addEventListener('inter_tx_recorded', handleRecorded)
     const interval = setInterval(() => void fetchTxns(), 25_000)
     return () => {
@@ -498,7 +374,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       clearInterval(interval)
     }
   /* oxlint-enable react/set-state-in-effect */
-  }, [fetchTxns])
+  }, [fetchTxns, chainId])
 
   return { transactions, isLoading, isError, refetch: fetchTxns }
 }

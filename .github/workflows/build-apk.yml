@@ -33,7 +33,7 @@ jobs:
 
       - name: Build Web Assets
         env:
-          VITE_TOWER_API_KEY: ${{ secrets.VITE_TOWER_API_KEY }}
+          VITE_TOWER_PROXY_URL: ${{ vars.VITE_TOWER_PROXY_URL }}
         run: npm run build
 
       - name: Sync Capacitor Android

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { WalletProvider, useWallet } from './context/WalletContext'
-import { NetworkProvider } from './context/NetworkContext'
+import { NetworkProvider, useNetwork } from './context/NetworkContext'
 import { LandingScreen } from './components/onboarding/LandingScreen'
 import { CreateMnemonicScreen } from './components/onboarding/CreateMnemonicScreen'
 import { VerifyMnemonicScreen } from './components/onboarding/VerifyMnemonicScreen'
@@ -12,7 +12,8 @@ import { ActivityScreen } from './components/wallet/ActivityScreen'
 import { AssetsScreen } from './components/wallet/AssetsScreen'
 import { SettingsScreen } from './components/wallet/SettingsScreen'
 import { AnsScreen } from './components/wallet/AnsScreen'
-import { SwapScreen } from './components/wallet/SwapScreen'
+import { ExchangeScreen } from './components/wallet/ExchangeScreen'
+import { BridgeProvider } from './context/BridgeContext'
 import { SendSheet } from './components/wallet/SendSheet'
 import { ReceiveSheet } from './components/wallet/ReceiveSheet'
 import { NotificationPanel } from './components/wallet/NotificationPanel'
@@ -31,6 +32,7 @@ import { getInitialTheme, applyTheme, type Theme } from './utils/theme'
 function WalletApp() {
   const { screen, account } = useWallet()
   const address = account?.address
+  const { chainId } = useNetwork()
   const [activeTab, setActiveTab] = useState<NavTab>('home')
   const [sendOpen, setSendOpen] = useState(false)
   const [receiveOpen, setReceiveOpen] = useState(false)
@@ -48,7 +50,7 @@ function WalletApp() {
 
   // Live transactions (fetched at app level so notifications work on every tab)
   const { transactions, isLoading: txLoading, isError: txError } = useArcTransactions(address)
-  const { notifications, unreadCount, markAllRead, clearAll } = useNotifications(transactions)
+  const { notifications, unreadCount, markAllRead, clearAll } = useNotifications(transactions, `${chainId}:${address ?? ''}`)
   // Resolve the user primary ANS name for the header avatar tooltip
   const { primaryName } = useArcNSPrimaryName(address)
 
@@ -59,6 +61,7 @@ function WalletApp() {
     if (target === 'assets') setActiveTab('assets')
     if (target === 'settings') setActiveTab('settings')
     if (target === 'ans') setActiveTab('ans')
+    if (target === 'bridge') setActiveTab('bridge')
   }
 
   if (!isUnlocked) {
@@ -252,10 +255,10 @@ function WalletApp() {
               </ErrorBoundary>
             </motion.div>
           )}
-          {activeTab === 'swap' && (
+          {(activeTab === 'swap' || activeTab === 'bridge') && (
             <motion.div key="swap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Swap Error">
-                <SwapScreen />
+                <ExchangeScreen mode={activeTab} onChange={setActiveTab} />
               </ErrorBoundary>
             </motion.div>
           )}
@@ -276,7 +279,7 @@ function WalletApp() {
         </AnimatePresence>
       </div>
 
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab === 'bridge' ? 'swap' : activeTab} onChange={setActiveTab} />
 
       {/* Sheets */}
       <ErrorBoundary fallbackTitle="Send Sheet Error">
@@ -294,7 +297,7 @@ export default function App() {
     <ErrorBoundary fallbackTitle="Inter Wallet Encountered an Issue">
       <NetworkProvider>
         <WalletProvider>
-          <WalletApp />
+          <BridgeProvider><WalletApp /></BridgeProvider>
         </WalletProvider>
       </NetworkProvider>
     </ErrorBoundary>

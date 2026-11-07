@@ -24,7 +24,7 @@ function NotifItem({ n }: { n: WalletNotification }) {
 
   return (
     <a
-      href={buildTxExplorerUrl(chainId, n.txHash)}
+      href={buildTxExplorerUrl(n.chainId ?? chainId, n.txHash)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-start gap-3 px-4 py-3.5 transition-all hover:bg-black/4"

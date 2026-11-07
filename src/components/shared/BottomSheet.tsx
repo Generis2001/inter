@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { spectral } from './GlassCard'
@@ -16,7 +17,9 @@ interface BottomSheetProps {
 }
 
 export function BottomSheet({ open, onClose, title, children, showSpectral = true }: BottomSheetProps) {
-  return (
+  // Page transition/blur layers create stacking contexts. Mount sheets at the
+  // document root so confirmation and PIN controls stay above navigation.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -64,6 +67,7 @@ export function BottomSheet({ open, onClose, title, children, showSpectral = tru
           </motion.section>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }

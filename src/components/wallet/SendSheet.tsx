@@ -291,23 +291,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
       setStep('error')
       toast.error(msg)
 
-      // Record failed transaction so it appears in Activity screen under 'failed' and 'sent'
-      if (account && parsedAmount) {
-        recordTransaction({
-          hash: `0x${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`,
-          from: account.address.toLowerCase() as `0x${string}`,
-          to: isValidAddress(effectiveAddress) ? (effectiveAddress.toLowerCase() as `0x${string}`) : null,
-          value: parsedAmount.toFixed(2),
-          rawValue: parsedAmount.raw,
-          tokenSymbol: selectedToken.symbol,
-          timestamp: Date.now(),
-          status: 'failed',
-          direction: 'sent',
-          blockNumber: null,
-          gasUsed: '0',
-          txType: 'transfer',
-        })
-      }
+
     }
   }
 

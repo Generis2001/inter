@@ -10,24 +10,28 @@
 import { useState, useCallback } from 'react'
 import { useTowerSwap } from './useTowerSwap'
 import { useV4Swap } from './useV4Swap'
+import { useNetwork } from '../context/NetworkContext'
 
 export type SwapRoute = 'tower' | 'uniswap-v4'
 
 export function useSwap() {
-  const [route, setRoute] = useState<SwapRoute>('tower')
+  const { isTestnet } = useNetwork()
+  const [selectedRoute, setRoute] = useState<SwapRoute>('tower')
   const [slippageBps, setSlippageBps] = useState(50) // 0.5% default
 
   const tower  = useTowerSwap(slippageBps)
   const uniV4  = useV4Swap(slippageBps)
 
+  const route: SwapRoute = isTestnet ? 'tower' : selectedRoute
   const active = route === 'tower' ? tower : uniV4
 
   const switchRoute = useCallback((next: SwapRoute) => {
+    if (isTestnet && next === 'uniswap-v4') return
     setRoute(next)
     // Reset both hooks so stale quotes don't bleed through
     tower.reset()
     uniV4.reset()
-  }, [tower, uniV4])
+  }, [tower, uniV4, isTestnet])
 
   // Normalise the SwapState so SwapScreen only deals with one shape.
   // useV4Swap's 'quoted' state has no dexName; fill in a label.

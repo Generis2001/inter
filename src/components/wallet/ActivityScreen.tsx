@@ -2,32 +2,26 @@ import { useState } from 'react'
 import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
 import { Skeleton } from '../shared/Skeleton'
-import { TokenIcon } from '../shared/TokenLogo'
-import { TowerLogo } from '../shared/TowerLogo'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
-import { ArrowUpRight, ArrowDownLeft, FileCode, ExternalLink } from 'lucide-react'
+import { ExternalLink } from 'lucide-react'
 import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
 import { useNetwork } from '../../context/NetworkContext'
+import { TransactionIcon } from '../shared/TransactionIcon'
+import { transactionKind } from '../../utils/transactionPresentation'
 
 
-type Filter = 'all' | 'sent' | 'received' | 'swaps' | 'pending' | 'failed'
+type Filter = 'all' | 'sent' | 'received' | 'swaps' | 'bridges' | 'pending' | 'failed'
 
 function TxItem({ tx }: { tx: ArcTransaction }) {
   const { chainId } = useNetwork()
   const isSent = tx.direction === 'sent'
   const isContract = tx.direction === 'contract'
-  const isTower = (tx.contractName ?? '').toLowerCase().includes('tower')
-  const isSwap =
-    tx.txType === 'swap' ||
-    isTower ||
-    (tx.contractName ?? '').toLowerCase().includes('uniswap') ||
-    (tx.contractName ?? '').toLowerCase().includes('dex') ||
-    (tx.method ?? '').toLowerCase().includes('swap')
-  const symbol = (tx.tokenSymbol === 'EURC' ? 'EURC' : 'USDC')
+  const kind = transactionKind(tx)
+  const isSwap = kind === 'swap'
   const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
 
-  const title = isSwap
+  const title = kind === 'bridge' ? (tx.method ?? 'Bridge') : kind === 'transfer' ? (isSent ? 'Sent' : 'Received') : isSwap
     ? 'Swap'
     : isContract
       ? (tx.method ?? tx.contractName ?? 'Contract Interaction')
@@ -39,7 +33,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
 
   return (
     <a
-      href={buildTxExplorerUrl(chainId, tx.hash)}
+      href={buildTxExplorerUrl(tx.chainId ?? chainId, tx.hash)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-start gap-3 rounded-2xl px-4 py-3.5 transition-all hover:bg-black/4 dark:hover:bg-white/4"
@@ -47,7 +41,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
       {/* Direction or Contract icon with token logo overlay */}
       <div className="relative mt-0.5 shrink-0">
         <div
-          className="flex size-9 items-center justify-center rounded-xl"
+          className="flex size-11 items-center justify-center rounded-2xl"
           style={{
             background: tx.status === 'failed'
               ? 'rgba(186,43,76,0.10)'
@@ -58,22 +52,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
                   : isSent ? 'rgba(18,45,69,0.08)' : 'rgba(26,128,71,0.10)',
           }}
         >
-          {tx.status === 'failed' ? (
-            <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
-          ) : isTower ? (
-            <TowerLogo size={16} />
-          ) : isSwap ? (
-            <ArrowUpRight className="size-4" style={{ color: 'var(--accent)' }} />
-          ) : isContract ? (
-            <FileCode className="size-4" style={{ color: 'var(--accent)' }} />
-          ) : isSent ? (
-            <ArrowUpRight className="size-4" style={{ color: 'var(--ink-2)' }} />
-          ) : (
-            <ArrowDownLeft className="size-4" style={{ color: 'var(--success)' }} />
-          )}
-        </div>
-        <div className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-          <TokenIcon symbol={symbol} size={12} />
+          <TransactionIcon tx={tx} size={34} />
         </div>
       </div>
 
@@ -84,14 +63,14 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
               <p className="text-sm font-semibold truncate" style={{ color: 'var(--ink)' }}>
                 {title}
               </p>
-              {isSwap ? (
+              {kind === 'bridge' ? <span className="rounded px-1.5 py-0.5 text-[10px] font-bold" style={{ background: 'var(--accent-lighter)', color: 'var(--accent)' }}>Bridge</span> : isSwap ? (
                 <span
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0"
                   style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
                 >
                   Swap
                 </span>
-              ) : isContract ? (
+              ) : isContract && kind !== 'transfer' ? (
                 <span
                   className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0"
                   style={{ background: 'rgba(6,182,212,0.12)', color: 'var(--accent)' }}
@@ -169,6 +148,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: 'sent', label: 'Sent' },
   { key: 'received', label: 'Received' },
   { key: 'swaps', label: 'Swaps' },
+  { key: 'bridges', label: 'Bridges' },
   { key: 'pending', label: 'Pending' },
   { key: 'failed', label: 'Failed' },
 ]
@@ -182,24 +162,20 @@ interface ActivityScreenProps {
 export function ActivityScreen({ transactions, isLoading = false, isError = false }: ActivityScreenProps) {
   const [filter, setFilter] = useState<Filter>('all')
 
-  const isSwapTx = (tx: ArcTransaction) =>
-    tx.txType === 'swap' ||
-    Boolean(tx.method?.toLowerCase().includes('swap')) ||
-    Boolean(tx.contractName?.toLowerCase().includes('tower')) ||
-    Boolean(tx.contractName?.toLowerCase().includes('uniswap')) ||
-    Boolean(tx.contractName?.toLowerCase().includes('router'))
+  const isSwapTx = (tx: ArcTransaction) => transactionKind(tx) === 'swap'
 
   const isSentTx = (tx: ArcTransaction) =>
-    !isSwapTx(tx) && (tx.direction === 'sent' || tx.txType === 'transfer')
+    transactionKind(tx) === 'transfer' && tx.direction === 'sent'
 
   const isReceivedTx = (tx: ArcTransaction) =>
-    tx.direction === 'received'
+    transactionKind(tx) === 'transfer' && tx.direction === 'received'
 
   const counts: Record<Filter, number> = {
     all: transactions.length,
     sent: transactions.filter(isSentTx).length,
     received: transactions.filter(isReceivedTx).length,
     swaps: transactions.filter(isSwapTx).length,
+    bridges: transactions.filter(tx => transactionKind(tx) === 'bridge').length,
     pending: transactions.filter((t) => t.status === 'pending').length,
     failed: transactions.filter((t) => t.status === 'failed').length,
   }
@@ -209,6 +185,7 @@ export function ActivityScreen({ transactions, isLoading = false, isError = fals
     if (filter === 'sent') return isSentTx(tx)
     if (filter === 'received') return isReceivedTx(tx)
     if (filter === 'swaps') return isSwapTx(tx)
+    if (filter === 'bridges') return transactionKind(tx) === 'bridge'
     if (filter === 'pending') return tx.status === 'pending'
     if (filter === 'failed') return tx.status === 'failed'
     return true

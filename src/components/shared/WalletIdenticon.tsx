@@ -29,7 +29,7 @@ const PALETTES = [
 // ---- Hash utility -----------------------------------------------------------
 // Simple deterministic hash from address string → array of bytes (0–255)
 function hashAddress(addr: string | null | undefined): number[] {
-  if (!addr || typeof addr !== 'string') return new Array(20).fill(42)
+  if (!addr || typeof addr !== 'string') return Array<number>(20).fill(42)
   const norm = addr.toLowerCase().replace(/^0x/, '')
   const bytes: number[] = []
   for (let i = 0; i < norm.length; i += 2) {

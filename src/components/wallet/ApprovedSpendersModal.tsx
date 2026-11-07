@@ -13,7 +13,7 @@ import {
 } from '../../utils/allowances'
 import { useRequireTxPin } from '../../utils/securitySettings'
 import { PinVerificationModal } from '../shared/PinVerificationModal'
-import { buildTxExplorerUrl } from '@/onchain-facts'
+import { buildAddressExplorerUrl, requireChain } from '@/onchain-facts'
 import {
   ShieldCheck,
   ShieldAlert,
@@ -46,14 +46,14 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
     if (!account?.address) return
     setLoading(true)
     try {
-      const active = await fetchActiveAllowances(account.address)
+      const active = await fetchActiveAllowances(account.address, chainId)
       setAllowances(active)
     } catch {
       toast.error('Failed to load token allowances')
     } finally {
       setLoading(false)
     }
-  }, [account])
+  }, [account, chainId])
 
   /* oxlint-disable react/set-state-in-effect */
   useEffect(() => {
@@ -65,7 +65,7 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
 
   const executeRevoke = async (item: ActiveAllowance) => {
     if (!account) return
-    setRevokingAddress(`${item.tokenAddress}_${item.spenderAddress}`)
+    setRevokingAddress(`${item.chainId}_${item.tokenAddress}_${item.spenderAddress}`)
     try {
       await revokeAllowance(
         account,
@@ -73,6 +73,7 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
         item.spenderAddress,
         item.spenderName,
         item.tokenSymbol,
+        item.chainId,
       )
       toast.success(`Revoked allowance for ${item.spenderName}`)
       void loadAllowances()
@@ -152,7 +153,7 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
             <div className="space-y-3">
               <AnimatePresence>
                 {allowances.map((item) => {
-                  const itemKey = `${item.tokenAddress}_${item.spenderAddress}`
+                  const itemKey = `${item.chainId}_${item.tokenAddress}_${item.spenderAddress}`
                   const isRevoking = revokingAddress === itemKey
 
                   return (
@@ -170,12 +171,13 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <TokenIcon symbol={item.tokenSymbol} size={32} />
+                          <TokenIcon symbol={item.tokenSymbol === 'EURC' ? 'EURC' : 'USDC'} size={32} />
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>
                                 {item.spenderName}
                               </span>
+                              <span className="text-[10px]" style={{ color: 'var(--muted)' }}>{requireChain(item.chainId).name}</span>
                               {item.isUnlimited ? (
                                 <span
                                   className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold"
@@ -204,7 +206,7 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
                                 {item.spenderAddress.slice(0, 6)}...{item.spenderAddress.slice(-4)}
                               </span>
                               <a
-                                href={buildTxExplorerUrl(chainId, item.spenderAddress)}
+                                href={buildAddressExplorerUrl(item.chainId, item.spenderAddress)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="transition-opacity hover:opacity-75"

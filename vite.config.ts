@@ -1,11 +1,23 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
+// @ts-expect-error The Node middleware is shared with the standalone server.
+import { towerMiddleware } from './server/tower-proxy.mjs'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 export default defineConfig({
   base: './',
-  plugins: [react(), nodePolyfills()],
+  plugins: [react(), nodePolyfills(), {
+    name: 'inter-tower-proxy',
+    configureServer(server) {
+      const env = loadEnv(server.config.mode, process.cwd(), 'TOWER_')
+      server.middlewares.use(towerMiddleware({
+        apiKey: process.env.TOWER_API_KEY ?? env.TOWER_API_KEY,
+        sameOrigin: true,
+        allowedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173', ...(env.TOWER_ALLOWED_ORIGINS ?? '').split(',').filter(Boolean)],
+      }))
+    },
+  }],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

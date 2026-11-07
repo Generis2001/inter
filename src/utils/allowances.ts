@@ -3,8 +3,9 @@
  * Allows viewing active ERC-20 token allowances and revoking permissions.
  */
 import { createPublicClient, createWalletClient, http, type CustomTransport } from 'viem'
-import { arc } from 'viem/chains'
-import { TOKENS } from './tokens'
+import { getBridgeChain } from './bridgeChains'
+import { requireChain } from '../onchain-facts'
+import { TOKENS, getTokens } from './tokens'
 import { recordTransaction } from '../hooks/useArcTransactions'
 import { Amount } from '@/onchain-money'
 
@@ -32,6 +33,7 @@ export const ERC20_ALLOWANCE_ABI = [
 ] as const
 
 export interface KnownSpender {
+  chainId: number
   tokenAddress: `0x${string}`
   tokenSymbol: string
   spenderAddress: `0x${string}`
@@ -40,6 +42,7 @@ export interface KnownSpender {
 }
 
 export interface ActiveAllowance {
+  chainId: number
   tokenAddress: `0x${string}`
   tokenSymbol: string
   tokenDecimals: number
@@ -67,7 +70,7 @@ const DEFAULT_SPENDERS: { address: `0x${string}`; name: string }[] = [
 ]
 
 function getSpendersStorageKey(walletAddress: string): string {
-  return `inter_known_spenders_${walletAddress.toLowerCase()}`
+  return `inter_known_spenders_v2_${walletAddress.toLowerCase()}`
 }
 
 export function recordKnownSpender(
@@ -77,20 +80,22 @@ export function recordKnownSpender(
     tokenSymbol: string
     spenderAddress: `0x${string}`
     spenderName: string
+    chainId?: number
   },
 ): void {
   try {
     const key = getSpendersStorageKey(walletAddress)
-    const existingRaw = localStorage.getItem(key)
-    const list: KnownSpender[] = existingRaw ? JSON.parse(existingRaw) : []
+    const list = getRecordedSpenders(walletAddress)
 
     const index = list.findIndex(
       (item) =>
+        item.chainId === (entry.chainId ?? 5042) &&
         item.tokenAddress.toLowerCase() === entry.tokenAddress.toLowerCase() &&
         item.spenderAddress.toLowerCase() === entry.spenderAddress.toLowerCase(),
     )
 
     const updatedItem: KnownSpender = {
+      chainId: entry.chainId ?? 5042,
       tokenAddress: entry.tokenAddress.toLowerCase() as `0x${string}`,
       tokenSymbol: entry.tokenSymbol,
       spenderAddress: entry.spenderAddress.toLowerCase() as `0x${string}`,
@@ -113,7 +118,9 @@ export function getRecordedSpenders(walletAddress: string): KnownSpender[] {
   try {
     const key = getSpendersStorageKey(walletAddress)
     const existingRaw = localStorage.getItem(key)
-    return existingRaw ? JSON.parse(existingRaw) : []
+    const current = (existingRaw ? JSON.parse(existingRaw) : []) as KnownSpender[]
+    const legacy = JSON.parse(localStorage.getItem(`inter_known_spenders_${walletAddress.toLowerCase()}`) ?? '[]') as KnownSpender[]
+    return [...current, ...legacy.map(row => ({ ...row, chainId: row.chainId ?? 5042 }))]
   } catch {
     return []
   }
@@ -124,12 +131,13 @@ export function getRecordedSpenders(walletAddress: string): KnownSpender[] {
  */
 export async function fetchActiveAllowances(
   walletAddress: `0x${string}`,
+  chainId = 5042,
 ): Promise<ActiveAllowance[]> {
-  const publicClient = createPublicClient({ chain: arc, transport: http() })
   const recorded = getRecordedSpenders(walletAddress)
 
   // Combine default spenders with recorded ones
   const candidates: {
+    chainId: number
     tokenAddress: `0x${string}`
     tokenSymbol: string
     tokenDecimals: number
@@ -140,12 +148,13 @@ export async function fetchActiveAllowances(
   const seen = new Set<string>()
 
   // 1. Check all tokens against default spenders
-  for (const token of TOKENS) {
+  for (const token of getTokens(chainId)) {
     for (const def of DEFAULT_SPENDERS) {
-      const key = `${token.address.toLowerCase()}_${def.address.toLowerCase()}`
+      const key = `${chainId}_${token.address.toLowerCase()}_${def.address.toLowerCase()}`
       if (!seen.has(key)) {
         seen.add(key)
         candidates.push({
+          chainId,
           tokenAddress: token.address,
           tokenSymbol: token.symbol,
           tokenDecimals: token.decimals,
@@ -158,13 +167,15 @@ export async function fetchActiveAllowances(
 
   // 2. Check recorded spenders
   for (const rec of recorded) {
-    const key = `${rec.tokenAddress.toLowerCase()}_${rec.spenderAddress.toLowerCase()}`
+    if (requireChain(rec.chainId).isTestnet !== requireChain(chainId).isTestnet) continue
+    const key = `${rec.chainId}_${rec.tokenAddress.toLowerCase()}_${rec.spenderAddress.toLowerCase()}`
     if (!seen.has(key)) {
       seen.add(key)
       const token = TOKENS.find(
         (t) => t.address.toLowerCase() === rec.tokenAddress.toLowerCase(),
       )
       candidates.push({
+        chainId: rec.chainId,
         tokenAddress: rec.tokenAddress,
         tokenSymbol: rec.tokenSymbol || token?.symbol || 'TOKEN',
         tokenDecimals: token?.decimals ?? 6,
@@ -179,6 +190,7 @@ export async function fetchActiveAllowances(
   await Promise.all(
     candidates.map(async (cand) => {
       try {
+        const publicClient = createPublicClient({ chain: getBridgeChain(cand.chainId).chain, transport: http() })
         const allowance = await publicClient.readContract({
           address: cand.tokenAddress,
           abi: ERC20_ALLOWANCE_ABI,
@@ -194,6 +206,7 @@ export async function fetchActiveAllowances(
             : `${Amount.fromRaw(allowance, cand.tokenDecimals).toFixed(2)} ${cand.tokenSymbol}`
 
           results.push({
+            chainId: cand.chainId,
             tokenAddress: cand.tokenAddress,
             tokenSymbol: cand.tokenSymbol,
             tokenDecimals: cand.tokenDecimals,
@@ -222,16 +235,18 @@ export async function revokeAllowance(
   spenderAddress: `0x${string}`,
   spenderName: string,
   tokenSymbol: string,
+  chainId = 5042,
 ): Promise<`0x${string}`> {
   type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A }
     ? NonNullable<A>
     : never
   const viemAcct = account as unknown as ViemAccount
 
-  const publicClient = createPublicClient({ chain: arc, transport: http() })
+  const chain = getBridgeChain(chainId).chain
+  const publicClient = createPublicClient({ chain, transport: http() })
   const walletClient = createWalletClient({
     account: viemAcct,
-    chain: arc,
+    chain,
     transport: http() as unknown as CustomTransport,
   })
 
@@ -243,7 +258,8 @@ export async function revokeAllowance(
     args: [spenderAddress, 0n],
   })
 
-  await publicClient.waitForTransactionReceipt({ hash })
+  const receipt = await publicClient.waitForTransactionReceipt({ hash })
+  if (receipt.status !== 'success') throw new Error('Allowance revocation reverted.')
 
   // Record revoke in transaction history
   recordTransaction({
@@ -261,7 +277,7 @@ export async function revokeAllowance(
     contractName: spenderName,
     method: 'Revoke Approval',
     txType: 'approval',
-  })
+  }, chainId)
 
   window.dispatchEvent(new CustomEvent('inter_allowances_updated'))
   return hash

@@ -11,7 +11,14 @@ import {
   type Blockchain as ScpBlockchain,
   type CircleSmartContractPlatformClient,
 } from '@circle-fin/smart-contract-platform';
-import { getChain } from '@circlefin/compass-chains';
+import { ONCHAIN_CHAINS } from '../src/onchain-facts';
+
+function getChain(id: string) {
+  const normalized = id.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const chain = ONCHAIN_CHAINS.find(row => row.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normalized);
+  if (!chain) throw new Error('Unknown chain: ' + id);
+  return { ...chain, explorerUrl: chain.explorerBase };
+}
 import { type Abi, type Hex, createPublicClient, createWalletClient, encodeFunctionData, http, keccak256 } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 

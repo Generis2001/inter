@@ -27,7 +27,7 @@ jobs:
 
       - name: Build Web Assets (Includes Manifest V3)
         env:
-          VITE_TOWER_API_KEY: ${{ secrets.VITE_TOWER_API_KEY }}
+          VITE_TOWER_PROXY_URL: ${{ vars.VITE_TOWER_PROXY_URL }}
         run: npm run build
 
       - name: Package Chrome Extension ZIP

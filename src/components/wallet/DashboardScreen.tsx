@@ -6,7 +6,6 @@ import { PageBackground } from '../shared/PageBackground'
 import { Skeleton } from '../shared/Skeleton'
 import { NetworkBadge } from '../shared/NetworkBadge'
 import { TokenIcon } from '../shared/TokenLogo'
-import { TowerLogo } from '../shared/TowerLogo'
 import { WalletIdenticon } from '../shared/WalletIdenticon'
 import { formatAddress } from '../../utils/wallet'
 import { buildTxExplorerUrl } from '@/onchain-facts'
@@ -15,18 +14,18 @@ import { useNetwork } from '../../context/NetworkContext'
 import {
   ArrowUpRight,
   ArrowDownLeft,
-  ArrowLeftRight,
   History,
   Copy,
   Check,
   TrendingUp,
   Coins,
-  FileCode,
-  RefreshCw,
   ExternalLink,
+  Route,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
+import { TransactionIcon } from '../shared/TransactionIcon'
+import { transactionKind } from '../../utils/transactionPresentation'
 
 interface DashboardScreenProps {
   onNavigate: (screen: string) => void
@@ -41,14 +40,11 @@ function TxRow({ tx, chainId }: { tx: ArcTransaction; chainId: number }) {
   const isContract = tx.direction === 'contract'
   const isFailed = tx.status === 'failed'
   const isPending = tx.status === 'pending'
-  const isSwap =
-    tx.txType === 'swap' ||
-    (tx.contractName ?? '').toLowerCase().includes('tower') ||
-    (tx.contractName ?? '').toLowerCase().includes('uniswap')
-  const isTower = isSwap && (tx.contractName ?? '').toLowerCase().includes('tower')
+  const kind = transactionKind(tx)
+  const isSwap = kind === 'swap'
   const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
 
-  const title = isSwap
+  const title = kind === 'bridge' ? (tx.method ?? 'Bridge') : kind === 'transfer' ? (isSent ? 'Sent' : 'Received') : isSwap
     ? 'Swap'
     : isContract
       ? (tx.method ?? tx.contractName ?? 'Contract')
@@ -70,7 +66,7 @@ function TxRow({ tx, chainId }: { tx: ArcTransaction; chainId: number }) {
 
   return (
     <a
-      href={buildTxExplorerUrl(chainId, tx.hash)}
+      href={buildTxExplorerUrl(tx.chainId ?? chainId, tx.hash)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center gap-3 rounded-2xl px-3.5 py-3 transition-all hover:bg-black/5 dark:hover:bg-white/5 active:scale-[0.99]"
@@ -91,19 +87,7 @@ function TxRow({ tx, chainId }: { tx: ArcTransaction; chainId: number }) {
                     : 'rgba(16,185,129,0.12)',
         }}
       >
-        {isFailed ? (
-          <ArrowUpRight className="size-4" style={{ color: 'var(--danger)' }} />
-        ) : isTower ? (
-          <TowerLogo size={18} />
-        ) : isSwap ? (
-          <RefreshCw className="size-4" style={{ color: 'var(--accent)' }} />
-        ) : isContract ? (
-          <FileCode className="size-4" style={{ color: '#818cf8' }} />
-        ) : isSent ? (
-          <ArrowUpRight className="size-4" style={{ color: 'var(--accent)' }} />
-        ) : (
-          <ArrowDownLeft className="size-4" style={{ color: 'var(--success)' }} />
-        )}
+        <TransactionIcon tx={tx} size={32} />
       </div>
 
       <div className="min-w-0 flex-1">
@@ -302,7 +286,7 @@ export function DashboardScreen({
             </div>
 
             {/* Quick Action Hub: Send, Receive, History */}
-            <div className="mt-6 grid w-full max-w-xs grid-cols-3 gap-3 pt-2 mx-auto">
+            <div className="mt-6 grid w-full max-w-xs grid-cols-4 gap-3 pt-2 mx-auto">
               {/* 1. Send */}
               <button
                 onClick={onShowSend}
@@ -342,7 +326,11 @@ export function DashboardScreen({
                 </span>
               </button>
 
-              {/* 3. History */}
+              <button onClick={() => onNavigate('bridge')} className="group flex flex-col items-center gap-1.5 transition-all">
+                <div className="flex size-13 items-center justify-center rounded-2xl shadow-sm transition-all group-hover:scale-105 group-active:scale-95" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--accent)' }}><Route className="size-5" /></div>
+                <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Bridge</span>
+              </button>
+              {/* History */}
               <button
                 onClick={() => onNavigate('activity')}
                 className="group flex flex-col items-center gap-1.5 transition-all"

@@ -1,7 +1,7 @@
 import { Home, Activity, Settings, AtSign, ArrowLeftRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export type NavTab = 'home' | 'activity' | 'assets' | 'swap' | 'ans' | 'settings'
+export type NavTab = 'home' | 'activity' | 'assets' | 'swap' | 'bridge' | 'ans' | 'settings'
 
 interface BottomNavProps {
   active: NavTab

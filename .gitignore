@@ -28,6 +28,8 @@ Thumbs.db
 *.log
 console.jsonl
 traces.jsonl
+.playwright-cli/
+output/playwright/
 
 # Native & extension builds
 *.zip

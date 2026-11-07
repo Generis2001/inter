@@ -7,9 +7,9 @@
  *  3. Sign & broadcast approve tx (if needed), then sign & broadcast swap tx
  *
  * API base: https://www.tower.exchange/api/public
- * Auth: Authorization: Bearer <VITE_TOWER_API_KEY>
+ * Auth: server-side Tower proxy; no API key is bundled in the client
  */
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import {
   createPublicClient,
   createWalletClient,
@@ -19,16 +19,16 @@ import {
   type Address,
 } from 'viem'
 import { arc } from 'viem/chains'
+import { arcTestnet } from '../config'
+import { towerRequest } from '../services/tower'
 import { useWallet } from '../context/WalletContext'
-import { TOKENS, type TokenInfo } from '../utils/tokens'
+import { TOKENS, getTokenAddress, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
 import { recordTransaction } from './useArcTransactions'
 import { parseOnchainError } from '../utils/wallet'
 import { recordKnownSpender } from '../utils/allowances'
-import { useNetwork, ARC_TESTNET_ID } from '../context/NetworkContext'
+import { useNetwork } from '../context/NetworkContext'
 
-const TOWER_BASE = 'https://www.tower.exchange/api/public'
-const ARC_CHAIN_ID = 5042
 
 const ERC20_ABI = parseAbi([
   'function allowance(address owner, address spender) view returns (uint256)',
@@ -89,32 +89,6 @@ interface TowerBuildTxResponse {
 
 // ---- helpers ----------------------------------------------------------------
 
-// Fallback key from Vercel deployment if not injected via import.meta.env
-// (Base64 decoded so Git push protection does not falsely trip on the sk_live prefix)
-const FALLBACK_TOWER_API_KEY = typeof atob !== 'undefined'
-  ? atob('c2tfbGl2ZV85NTVkOWJhMzRiMjVmZjIxMGU5YzlmYmFiM2M1ZTA1NjJkZTcxMTg1NDUxOTA0MjU=')
-  : 'sk_' + 'live_955d9ba34b25ff210e9c9fbab3c5e0562de7118545190425'
-
-function getApiKey(): string {
-  const envKey = (import.meta.env.VITE_TOWER_API_KEY as string | undefined)?.trim()
-  return envKey || FALLBACK_TOWER_API_KEY
-}
-
-function getTowerHeaders(key: string): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-  }
-  if (key) {
-    headers['Authorization'] = `Bearer ${key}`
-    headers['x-api-key'] = key
-  }
-  return headers
-}
-
-function getPublicClient() {
-  return createPublicClient({ chain: arc, transport: http() })
-}
-
 function parseQuoteOutputAmount(data: TowerQuoteResponse['data'], decimals: number): Amount {
   // Tower returns outputAmountRaw / outputAmountNative in base token decimals (e.g. "8920" for 0.008920 EURC).
   // The outputAmount field is scaled to 1e18 (normalized_1e18, e.g. "8920000000000000").
@@ -137,25 +111,17 @@ async function towerQuote(
   tokenOut: TokenInfo,
   amountIn: bigint,
   slippageBps: number,
+  chainId: number,
 ): Promise<TowerQuoteResponse['data']> {
-  const key = getApiKey()
-  const res = await fetch(`${TOWER_BASE}/swap/quote`, {
-    method: 'POST',
-    headers: getTowerHeaders(key),
-    body: JSON.stringify({
-      inputToken:       tokenIn.symbol,   // Tower uses symbols (USDC/EURC), not hex addresses
-      outputToken:      tokenOut.symbol,
-      inputAmount:      amountIn.toString(),
-      slippageTolerance: slippageBps,
-      chainId:          ARC_CHAIN_ID,
-    }),
+  const json = await towerRequest<TowerQuoteResponse>('/swap/quote', {
+    inputToken: tokenIn.symbol, outputToken: tokenOut.symbol, inputAmount: amountIn.toString(),
+    slippageTolerance: slippageBps, chainId,
   })
-  const json = (await res.json()) as TowerQuoteResponse
   if (!json.success || !json.data) {
     // Surface the real API error so it can be shown / debugged
     const detail = (json as { error?: string; message?: string }).error
       ?? (json as { error?: string; message?: string }).message
-      ?? `HTTP ${res.status}`
+      ?? `Tower error`
     throw new Error(`Quote failed: ${detail}`)
   }
   return json.data
@@ -165,13 +131,7 @@ async function towerBuildTx(
   quoteData: unknown,
   userAddress: Address,
 ): Promise<TowerBuildTxResponse['data']> {
-  const key = getApiKey()
-  const res = await fetch(`${TOWER_BASE}/swap/build-tx`, {
-    method: 'POST',
-    headers: getTowerHeaders(key),
-    body: JSON.stringify({ quote: quoteData, userAddress }),
-  })
-  const json = (await res.json()) as TowerBuildTxResponse
+  const json = await towerRequest<TowerBuildTxResponse>('/swap/build-tx', { quote: quoteData, userAddress })
   if (!json.success || !json.data) throw new Error('Build tx failed')
   return json.data
 }
@@ -186,7 +146,10 @@ function parseAmountSafe(str: string, decimals: number): bigint | null {
 
 export function useTowerSwap(slippageBps = 50) {
   const { account } = useWallet()
-  const { isTestnet } = useNetwork()
+  const { isTestnet, chainId } = useNetwork()
+  const current = useRef({ account, chainId })
+  useLayoutEffect(() => { current.current = { account, chainId } }, [account, chainId])
+  const quoteGeneration = useRef(0)
   const [tokenIn, setTokenIn]     = useState<TokenInfo>(TOKENS[0])  // USDC
   const [tokenOut, setTokenOut]   = useState<TokenInfo>(TOKENS[1])  // EURC
   const [amountIn, setAmountIn]   = useState('')
@@ -202,6 +165,7 @@ export function useTowerSwap(slippageBps = 50) {
 
   // Debounced quote — all setState deferred inside setTimeout
   useEffect(() => {
+    const generation = ++quoteGeneration.current
     if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
     const parsed = parseAmountSafe(amountIn, tokenIn.decimals)
 
@@ -212,82 +176,46 @@ export function useTowerSwap(slippageBps = 50) {
       }
       setSwapState({ status: 'quoting' })
 
-      // On Testnet: provide fast local quote without querying mainnet Tower API
-      if (isTestnet) {
-        const numIn = parseFloat(amountIn)
-        const rate = tokenIn.symbol === 'USDC' ? 0.92 : 1.087
-        const numOut = numIn * rate * (1 - slippageBps / 10000)
-        const outRaw = BigInt(Math.max(1, Math.floor(numOut * 10 ** tokenOut.decimals)))
-        setSwapState({
-          status: 'quoted',
-          amountOut: Amount.fromRaw(outRaw, tokenOut.decimals),
-          priceImpact: 0.01,
-          dexName: 'Arc Testnet Swap',
-          quoteData: { isTestnet: true, inputAmount: parsed.toString(), outputAmount: outRaw.toString() },
-        })
-        return
-      }
-
-      // Mainnet: query real Tower API
-      void towerQuote(tokenIn, tokenOut, parsed, slippageBps)
+      // Both environments use real Tower quotes and on-chain transactions.
+      void towerQuote(tokenIn, tokenOut, parsed, slippageBps, chainId)
         .then((quote) => {
+          if (quoteGeneration.current !== generation) return
           setSwapState({
             status: 'quoted',
             amountOut: parseQuoteOutputAmount(quote, tokenOut.decimals),
             priceImpact: quote.priceImpact,
             dexName: quote.dexName,
-            quoteData: quote,
+            quoteData: { quote, chainId, amountRaw: parsed.toString() },
           })
         })
         .catch((err: unknown) => {
+          if (quoteGeneration.current !== generation) return
           const msg = err instanceof Error ? err.message : 'Quote unavailable'
           setSwapState({ status: 'error', message: msg })
         })
     }, 400)
 
     return () => {
+      ++quoteGeneration.current
       if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
     }
-  }, [amountIn, tokenIn, tokenOut, slippageBps, isTestnet])
+  }, [amountIn, tokenIn, tokenOut, slippageBps, chainId])
 
   const executeSwap = useCallback(async (options?: { unlimitedApproval?: boolean }) => {
     if (!account) return
     if (swapState.status !== 'quoted') return
     const { quoteData, amountOut, dexName } = swapState
 
-    // On Testnet: execute and record cleanly on Arc Testnet
-    if (isTestnet) {
-      setSwapState({ status: 'swapping' })
-      await new Promise((r) => setTimeout(r, 800))
-      const simulatedHash = ('0x' + Array.from({ length: 64 }, () => Math.floor(Math.random() * 16).toString(16)).join('')) as `0x${string}`
-      recordTransaction({
-        hash: simulatedHash,
-        from: account.address,
-        to: tokenOut.address,
-        value: amountIn,
-        rawValue: (parseAmountSafe(amountIn, tokenIn.decimals) ?? 0n).toString(),
-        timestamp: Date.now(),
-        status: 'success',
-        tokenSymbol: tokenIn.symbol,
-        direction: 'sent',
-        txType: 'swap',
-        contractName: 'Arc Testnet Swap',
-      }, ARC_TESTNET_ID)
-      setSwapState({
-        status: 'success',
-        txHash: simulatedHash,
-        amountOut,
-        dexName: 'Arc Testnet Swap',
-      })
-      return
-    }
-
-    // Mainnet: proceed with real onchain flow
     setSwapState({ status: 'approving' })
     try {
       type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A } ? NonNullable<A> : never
       const viemAcct   = account as unknown as ViemAccount
-      const publicClient  = getPublicClient()
+      const network = isTestnet ? arcTestnet : arc
+      const publicClient = createPublicClient({ chain: network, transport: http() })
+      const confirmedQuote = quoteData as { quote: unknown; chainId: number; amountRaw: string }
+      if (confirmedQuote.chainId !== chainId || confirmedQuote.amountRaw !== parseAmountSafe(amountIn, tokenIn.decimals)?.toString()) throw new Error('Quote changed. Review the swap again.')
+      const assertCurrent = () => { if (current.current.chainId !== chainId || current.current.account?.address !== account.address) throw new Error('Wallet or network changed.') }
+      assertCurrent()
 
       // Pre-flight check on Arc native gas balance before broadcasting
       try {
@@ -300,14 +228,15 @@ export function useTowerSwap(slippageBps = 50) {
         // Proceed if client check fails
       }
 
-      const walletClient  = createWalletClient({ account: viemAcct, chain: arc, transport: http() })
+      const walletClient  = createWalletClient({ account: viemAcct, chain: network, transport: http() })
 
       // Build tx calldata from Tower
-      const txData = await towerBuildTx(quoteData, account.address)
+      const txData = await towerBuildTx(confirmedQuote.quote, account.address)
 
       // Step 1: Ensure ERC-20 approval for Tower swap executor
       // Note: Tower's approve object provides `token` (the ERC20 contract address) and `spender` (the router/executor)
-      const tokenAddress = ((txData.approve?.token ?? txData.approve?.to ?? tokenIn.address) as Address)
+      const tokenAddress = getTokenAddress(tokenIn.symbol, chainId)
+      if ((txData.approve?.token ?? txData.approve?.to ?? tokenAddress).toLowerCase() !== tokenAddress.toLowerCase()) throw new Error('Tower returned an unexpected approval token.')
       const spender = ((txData.approve?.spender ?? txData.swap.executorAddress ?? txData.swap.to) as Address)
 
       const parsedIn = parseAmountSafe(amountIn, tokenIn.decimals) ?? 0n
@@ -319,6 +248,7 @@ export function useTowerSwap(slippageBps = 50) {
       })
 
       if (currentAllowance < parsedIn) {
+        assertCurrent()
         setSwapState({ status: 'approving' })
         const isUnlimited = !!options?.unlimitedApproval
         const approvalAmount = isUnlimited ? maxUint256 : parsedIn
@@ -338,13 +268,15 @@ export function useTowerSwap(slippageBps = 50) {
               functionName: 'approve',
               args: [spender, approvalAmount],
             })
-        await publicClient.waitForTransactionReceipt({ hash: approveTx })
+        const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTx })
+        if (approvalReceipt.status !== 'success') throw new Error('Approval reverted.')
 
         recordKnownSpender(account.address, {
           tokenAddress,
           tokenSymbol: tokenIn.symbol,
           spenderAddress: spender,
           spenderName: 'Tower DEX Router',
+          chainId,
         })
 
         recordTransaction({
@@ -362,10 +294,11 @@ export function useTowerSwap(slippageBps = 50) {
           contractName: 'Tower DEX Router',
           method: isUnlimited ? 'Approve Unlimited' : 'Approve Exact Amount',
           txType: 'approval',
-        })
+        }, chainId)
       }
 
       // Step 2: Swap
+      assertCurrent()
       setSwapState({ status: 'swapping' })
       const txHash = await walletClient.sendTransaction({
         account: viemAcct,
@@ -378,7 +311,7 @@ export function useTowerSwap(slippageBps = 50) {
       recordTransaction({
         hash: txHash,
         from: account.address.toLowerCase() as `0x${string}`,
-        to: (txData.swap.to as string).toLowerCase() as `0x${string}`,
+        to: (txData.swap.to).toLowerCase() as `0x${string}`,
         value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
         rawValue: parsedIn,
         tokenSymbol: tokenIn.symbol,
@@ -390,16 +323,17 @@ export function useTowerSwap(slippageBps = 50) {
         contractName: 'Tower DEX Router',
         method: 'Execute Swap',
         txType: 'swap',
-      })
+      }, chainId)
 
       setSwapState({ status: 'swapping', txHash })
-      await publicClient.waitForTransactionReceipt({ hash: txHash })
+      const swapReceipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+      if (swapReceipt.status !== 'success') throw new Error('Swap reverted.')
 
       // Update to success upon confirmation
       recordTransaction({
         hash: txHash,
         from: account.address.toLowerCase() as `0x${string}`,
-        to: (txData.swap.to as string).toLowerCase() as `0x${string}`,
+        to: (txData.swap.to).toLowerCase() as `0x${string}`,
         value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
         rawValue: parsedIn,
         tokenSymbol: tokenIn.symbol,
@@ -411,34 +345,14 @@ export function useTowerSwap(slippageBps = 50) {
         contractName: 'Tower DEX Router',
         method: 'Execute Swap',
         txType: 'swap',
-      })
+      }, chainId)
 
       setSwapState({ status: 'success', txHash, amountOut, dexName })
     } catch (err) {
       const clean = parseOnchainError(err)
-      const parsedIn = parseAmountSafe(amountIn, tokenIn.decimals) ?? 0n
-
-      // Record as failed transaction so Activity screen displays it under 'failed' and 'swaps'
-      recordTransaction({
-        hash: `0x${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`,
-        from: account.address.toLowerCase() as `0x${string}`,
-        to: tokenIn.address.toLowerCase() as `0x${string}`,
-        value: Amount.fromRaw(parsedIn, tokenIn.decimals).toFixed(2),
-        rawValue: parsedIn,
-        tokenSymbol: tokenIn.symbol,
-        timestamp: Date.now(),
-        status: 'failed',
-        direction: 'contract',
-        blockNumber: null,
-        gasUsed: '0',
-        contractName: 'Tower DEX Router',
-        method: 'Execute Swap',
-        txType: 'swap',
-      })
-
       setSwapState({ status: 'error', message: clean })
     }
-  }, [account, swapState, amountIn, tokenIn])
+  }, [account, swapState, amountIn, tokenIn, chainId, isTestnet])
 
   const reset = useCallback(() => {
     setAmountIn('')
