@@ -1,9 +1,31 @@
-import { defineConfig, loadEnv } from 'vite'
+import { defineConfig, loadEnv, type Plugin } from 'vite'
 // @ts-expect-error The Node middleware is shared with the standalone server.
 import { towerMiddleware } from './server/tower-proxy.mjs'
+// @ts-expect-error Shared Node build helper.
+import { syncExtensionBuild } from './scripts/sync-extension.mjs'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 import { nodePolyfills } from 'vite-plugin-node-polyfills'
+
+function extensionSyncPlugin(): Plugin {
+  let buildDir = ''
+  let root = ''
+  let installedDir = ''
+  return {
+    name: 'inter-extension-sync',
+    apply: 'build',
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.root, 'INTER_EXTENSION_')
+      buildDir = path.resolve(config.root, config.build.outDir)
+      root = config.root
+      installedDir = env.INTER_EXTENSION_DIR ?? ''
+    },
+    writeBundle() {
+      syncExtensionBuild(buildDir, path.join(root, 'unpacked-extension'))
+      if (installedDir) syncExtensionBuild(buildDir, installedDir, { requireExisting: true })
+    },
+  }
+}
 
 export default defineConfig({
   base: './',
@@ -17,7 +39,7 @@ export default defineConfig({
         allowedOrigins: ['http://localhost:5173', 'http://127.0.0.1:5173', ...(env.TOWER_ALLOWED_ORIGINS ?? '').split(',').filter(Boolean)],
       }))
     },
-  }],
+  }, extensionSyncPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

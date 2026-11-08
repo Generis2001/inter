@@ -42,4 +42,6 @@ bun run dev
 
 `npm install` / `npm run dev` also work. Validate with `npm run check`, `npm run test:bridge`, and `npm run build`. Tower requires server-side `TOWER_API_KEY`; never put a secret in a `VITE_` variable. Extension/Android builds need `VITE_TOWER_PROXY_URL` pointing to the deployed proxy and an allowed origin.
 
+Every production build refreshes `unpacked-extension/`. Local `INTER_EXTENSION_DIR` can mirror the build into an already installed unpacked Inter folder; keep its path and manifest key to preserve Chrome's extension identity and wallet storage. `npm run extension:watch` rebuilds/syncs on source changes; then Chrome's Reload button reads the updated files. This workspace's ignored local env points to the existing Windows installation, so builds need permission to write that directory outside the workspace sandbox.
+
 `src/onchain-facts.ts` is generated; do not edit it by hand. Supplement missing facts in feature modules and verify them against official documentation/live read-only contracts.

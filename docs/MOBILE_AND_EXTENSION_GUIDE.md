@@ -17,7 +17,7 @@ Inter is fully configured as a Manifest V3 Chrome Extension that supports **both
    ```bash
    npm run build
    ```
-   *(This builds into `dist/`, which contains `manifest.json`, `background.js`, `icons/`, and the web application)*
+   *(This builds into `dist/` and refreshes `unpacked-extension/`, which contain `manifest.json`, `background.js`, `icons/`, and the web application)*
 
 2. Open Chrome and navigate to:
    ```
@@ -26,10 +26,7 @@ Inter is fully configured as a Manifest V3 Chrome Extension that supports **both
 
 3. In the top-right corner, turn on **Developer mode**.
 
-4. Click **Load unpacked** (top-left) and select the `dist` folder:
-   ```
-   C:\Users\hp\.gemini\antigravity-ide\scratch\inter\dist
-   ```
+4. Click **Load unpacked** (top-left) and select the project's `unpacked-extension` folder. Existing installations keep using their original folder.
 
 5. Pin **Inter Wallet** in your Chrome toolbar.
    - Click the extension icon to open the wallet in **Popup mode**.
@@ -41,6 +38,14 @@ Run:
 npm run build:extension
 ```
 This generates `inter-chrome-extension.zip` in the project root.
+
+### Updating through Chrome's Reload button
+
+Chrome's Reload button reads the files in the folder already installed. Every `npm run build` now refreshes `unpacked-extension/`; `npm run build:extension` always builds current source before packaging.
+
+If Chrome loads Inter from another local folder, set `INTER_EXTENSION_DIR` in your ignored `.env.local` to that folder's absolute path. Builds also copy the updated app into it, preserving its path and any existing manifest key. Wallet data stays in Chrome's existing extension profile.
+
+Run `npm run extension:watch` to rebuild and sync automatically as source files change. Wait for the build to finish, then click Inter's **Reload** button at `chrome://extensions` and reopen its popup or side panel. Reload itself does not download GitHub releases; the installed files must be refreshed first.
 
 ---
 
@@ -85,7 +90,8 @@ If you have Android Studio installed locally on your computer:
 | Script | Purpose |
 |---|---|
 | `npm run build` | Builds the universal web app and Chrome extension (`dist/`) |
-| `npm run build:extension` | Packages `dist/` into `inter-chrome-extension.zip` |
+| `npm run build:extension` | Builds current source, syncs the installed extension folder, and packages the ZIP |
+| `npm run extension:watch` | Rebuilds and syncs automatically when source files change |
 | `npm run build:icons` | Generates all resolution PNG icons (16 to 512px) from the Inter logo |
 | `npm run cap:sync` | Syncs web build into the native Android Capacitor project |
 | `npm run cap:open` | Opens the native Android project in Android Studio |
