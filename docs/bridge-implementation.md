@@ -36,7 +36,7 @@ Tower's read scope covers Node RPC, including locally signed raw transaction sub
 
 `npm run dev` serves `/api/tower` through Vite. Do not use `VITE_TOWER_API_KEY`; Vite variables are public. The proxy permits four chain IDs, specific RPC methods, and supported swap endpoints, with request-size, rate, and concurrency limits.
 
-For Vercel web hosting, `api/tower/[...path].mjs` deploys alongside the Vite app. Set `TOWER_API_KEY` and any extension/Android origins in the **server** environment. Same-origin web builds leave `VITE_TOWER_PROXY_URL` empty. Existing deployments need a new build with these settings; this change does not deploy itself.
+For Vercel web hosting, explicit endpoints in `api/tower/` deploy alongside the Vite app and share `server/tower-handler.mjs`. Set `TOWER_API_KEY` and any extension/Android origins in the **server** environment. Same-origin web builds leave `VITE_TOWER_PROXY_URL` empty. Deploy the server endpoints along with the frontend.
 
 For another Node host, run `npm run tower:serve` behind HTTPS and forward `/api/tower/*` to port 8787 (or `TOWER_PORT`). Set `VITE_TOWER_PROXY_URL=https://<proxy-host>` before building a separately hosted frontend. `GET /api/tower/health` reports whether the server credential is configured without returning it.
 

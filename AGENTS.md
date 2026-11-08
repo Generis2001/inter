@@ -30,7 +30,7 @@ Inter is a self-custodial Arc wallet for USDC/EURC transfers, swaps, activity, A
 - `src/services/cctp.ts` - CCTP route/fee checks and attestation validation
 - `src/utils/bridgeHistory.ts` - persist signed transaction/hash before broadcast; retries must use identical bytes
 - `src/utils/transactionHistory.ts` - wallet + actual chain ID history; never read untagged mainnet records into testnet
-- `server/tower-proxy.mjs`, `api/tower/[...path].mjs` - server-only Tower credential and Node/Vercel proxies
+- `server/tower-proxy.mjs`, `server/tower-handler.mjs`, `api/tower/` - server-only Tower credential and explicit Node/Vercel proxy routes
 - `docs/bridge-implementation.md` - supported routes, setup, limitations, and validation
 
 ## To Run
