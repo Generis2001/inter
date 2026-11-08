@@ -31,6 +31,11 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps --no-package-lock
 
+      - name: Verify production proxy URL
+        env:
+          TOWER_PROXY_URL: ${{ vars.VITE_TOWER_PROXY_URL }}
+        run: node --input-type=module -e 'const url = new URL(process.env.TOWER_PROXY_URL || ""); if (url.protocol !== "https:") throw new Error("Set VITE_TOWER_PROXY_URL to the production HTTPS proxy before publishing");'
+
       - name: Build Web Assets
         env:
           VITE_TOWER_PROXY_URL: ${{ vars.VITE_TOWER_PROXY_URL }}

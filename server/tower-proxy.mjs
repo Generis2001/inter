@@ -31,9 +31,12 @@ export function towerMiddleware({ apiKey, allowedOrigins = [], sameOrigin = fals
       res.end(JSON.stringify(body))
     }
     const origin = req.headers.origin
+    // Unpacked Inter installs have machine-specific extension IDs. This opt-in
+    // supports them without allowing arbitrary web origins.
+    const extensionOrigin = allowedOrigins.includes('chrome-extension://*') && /^chrome-extension:\/\/[a-p]{32}$/.test(origin ?? '')
     let localOrigin = false
     try { localOrigin = sameOrigin && !!origin && new URL(origin).host === req.headers.host } catch { return send(403, { error: 'Invalid origin' }) }
-    if (origin && !allowedOrigins.includes(origin) && !localOrigin) return send(403, { error: 'Origin not allowed' })
+    if (origin && !allowedOrigins.includes(origin) && !localOrigin && !extensionOrigin) return send(403, { error: 'Origin not allowed' })
     if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin)
       res.setHeader('Vary', 'Origin')

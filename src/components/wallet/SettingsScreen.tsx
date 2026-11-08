@@ -367,7 +367,7 @@ export function SettingsScreen() {
           <div className="border-t" style={{ borderColor: 'var(--border)' }}>
             {[
               { label: 'App', value: 'inter' },
-              { label: 'Version', value: '1.0.0' },
+              { label: 'Version', value: '1.1.0' },
               { label: 'Built by', value: 'Generis2001' },
             ].map(({ label, value }, i) => (
               <div

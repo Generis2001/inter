@@ -2,6 +2,8 @@
 
 This guide explains how to access, build, and run Inter as an **Android Mobile App (APK)** and a **Chrome Extension (Popup & Side Panel)**.
 
+Version **1.1.0** includes USDC bridging on Arc mainnet/testnet, isolated network activity, and currency logos. Both packages use the production Tower proxy at `https://interwallet.vercel.app`; CI reads it from the repository variable `VITE_TOWER_PROXY_URL`. Local package builds should set that same public variable before `npm run build`. See [bridge setup](bridge-implementation.md) for server configuration.
+
 ---
 
 ## 1. Chrome Extension (Manifest V3)

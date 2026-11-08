@@ -49,3 +49,15 @@ test('proxy accepts Vercel parsed request bodies', async () => {
     assert.equal(status, 200)
   } finally { globalThis.fetch = original }
 })
+
+test('distributed extension support is opt-in and rejects malformed extension/web origins', async () => {
+  const origin = `chrome-extension://${'a'.repeat(32)}`
+  const strict = towerMiddleware({ apiKey: 'fixture', allowedOrigins: ['https://localhost'] })
+  assert.equal((await request(strict, '/api/tower/health', undefined, origin)).status, 403)
+  const distributed = towerMiddleware({ apiKey: 'fixture', allowedOrigins: ['https://localhost', 'chrome-extension://*'] })
+  assert.equal((await request(distributed, '/api/tower/health', undefined, origin)).status, 200)
+  assert.equal((await request(distributed, '/api/tower/health', undefined, 'https://localhost')).status, 200)
+  for (const bad of ['https://unapproved.example', `${origin}.evil.example`, `${origin}/page`, 'chrome-extension://invalid', `chrome-extension://${'z'.repeat(32)}`]) {
+    assert.equal((await request(distributed, '/api/tower/health', undefined, bad)).status, 403)
+  }
+})

@@ -42,6 +42,8 @@ For another Node host, run `npm run tower:serve` behind HTTPS and forward `/api/
 
 Extension and Android builds must set the public `VITE_TOWER_PROXY_URL` to the HTTPS web/proxy origin, and add their exact origins to `TOWER_ALLOWED_ORIGINS`. Android's configured origin is `https://localhost`; Chrome uses `chrome-extension://<extension-id>`. The release workflows now read the GitHub repository variable `VITE_TOWER_PROXY_URL` instead of injecting a Tower secret.
 
+Inter's production proxy is `https://interwallet.vercel.app`. Distributed unpacked extension installs can opt in to `chrome-extension://*` in the server allowlist: this permits valid Chrome extension IDs while continuing to reject other web origins. Exact IDs remain supported for installations where they are known.
+
 ## Activity migration
 
 Canonical history keys are `inter_wallet_txs_v2_<chainId>_<lowercaseAddress>`. Polling, recorded transactions, spender metadata, notifications, and explorer links all use the selected network. Delayed responses from a previous wallet/network cannot update the active history.
