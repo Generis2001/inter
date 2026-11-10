@@ -1,19 +1,12 @@
 /**
  * Fetch transaction history for an address on the active Arc chain.
- * Parses USDC, EURC ERC-20 token transfers, and contract interactions.
+ * Parses USDC, EURC, cirBTC ERC-20 token transfers, and contract interactions.
  * Uses the chain block explorer API with fallback to local transaction store.
  */
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react'
 import { Amount } from '@/onchain-money'
-import { TOKENS, TOKEN_BY_ADDRESS, EURC_TESTNET_ADDRESS, EURC_MAINNET_ADDRESS } from '../utils/tokens'
+import { TOKENS, TOKEN_BY_ADDRESS, getToken, getTokens, CIRBTC_MAINNET_ADDRESS, CIRBTC_TESTNET_ADDRESS } from '../utils/tokens'
 import { useNetwork } from '../context/NetworkContext'
-
-// All tracked token addresses (lowercase)
-const TRACKED_ADDRESSES = new Set([
-  ...TOKENS.map((t) => t.address.toLowerCase()),
-  EURC_TESTNET_ADDRESS.toLowerCase(),
-  EURC_MAINNET_ADDRESS.toLowerCase(),
-])
 
 import { getRecordedTransactions, persistWalletTransactions, type ArcTransaction } from '../utils/transactionHistory'
 export { recordTransaction, getRecordedTransactions, persistWalletTransactions, type ArcTransaction } from '../utils/transactionHistory'
@@ -54,6 +47,8 @@ const KNOWN_CONTRACTS: Record<string, { name: string; type: 'swap' | 'approval' 
   '0x3600000000000000000000000000000000000000': { name: 'USDC Contract', type: 'contract' },
   '0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1': { name: 'EURC Contract', type: 'contract' },
   '0x89b50855aa3be2f677cd6303cec089b5f319d72a': { name: 'EURC Contract', type: 'contract' },
+  [CIRBTC_MAINNET_ADDRESS.toLowerCase()]: { name: 'cirBTC Contract', type: 'contract' },
+  [CIRBTC_TESTNET_ADDRESS.toLowerCase()]: { name: 'cirBTC Contract', type: 'contract' },
 }
 
 export function formatTransactionValue(
@@ -63,6 +58,8 @@ export function formatTransactionValue(
   explicitDecimals?: number,
 ): string {
   const raw = typeof rawValue === 'bigint' ? rawValue : BigInt(rawValue || '0')
+  const token = TOKEN_BY_ADDRESS[tokenAddress?.toLowerCase() ?? ''] ?? getToken(tokenSymbol)
+  if (token?.symbol === 'cirBTC') return Amount.fromRaw(raw, token.decimals).toFixed(token.decimals)
   if (raw === 0n) return '0.00'
 
   const addr = tokenAddress?.toLowerCase() ?? ''
@@ -86,7 +83,10 @@ export function formatTransactionValue(
 }
 
 /** Sanitize formatted value if it was saved with 18-dec / 6-dec mismatch */
-export function sanitizeTxValue(valStr: string, rawVal?: bigint): string {
+export function sanitizeTxValue(valStr: string, rawVal?: bigint, tokenSymbol = 'USDC'): string {
+  if (getToken(tokenSymbol)?.symbol === 'cirBTC') {
+    return rawVal === undefined ? valStr || '0.00000000' : formatTransactionValue(rawVal, tokenSymbol)
+  }
   if (rawVal && rawVal >= 100_000_000_000_000n) {
     return formatTransactionValue(rawVal)
   }
@@ -128,6 +128,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
     if (!address) return
     const requestScope = scope
     const isCurrent = () => activeScope.current === requestScope
+    const trackedAddresses = new Set(getTokens(chainId).map(token => token.address.toLowerCase()))
 
     // CRITICAL: Only flash loading skeletons if we don't have any cached transactions.
     // Background polling while transactions are rendered will NEVER flicker or hide history.
@@ -155,7 +156,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
         const items = data.items ?? []
         parsed = items.map((tx) => {
           const trackedTransfer = tx.token_transfers?.find(
-            (t) => TRACKED_ADDRESSES.has(t.token.address.toLowerCase()),
+            (t) => trackedAddresses.has(t.token.address.toLowerCase()),
           )
 
           let rawValue: bigint
@@ -292,7 +293,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
           for (const log of allLogs) {
             if (log.topics.length < 3) continue
             const tokenAddr = log.address.toLowerCase()
-            if (!TRACKED_ADDRESSES.has(tokenAddr)) continue
+            if (!trackedAddresses.has(tokenAddr)) continue
             const tokenInfo = TOKEN_BY_ADDRESS[tokenAddr] ?? TOKENS[0]
             const rawVal = BigInt(log.data === '0x' ? '0' : log.data)
             const fromAddr = ('0x' + log.topics[1].slice(26)).toLowerCase() as `0x${string}`

@@ -1,12 +1,13 @@
 /**
  * Generic ERC-20 balance hook for any token on the active Arc chain.
- * Used for both USDC and EURC. Network is read from NetworkContext.
+ * Used for USDC, EURC, and cirBTC. Network is read from NetworkContext.
  */
 import { useReadContract } from 'wagmi'
 import { erc20Abi } from 'viem'
 import { Amount } from '@/onchain-money'
 import { getTokenAddress, type TokenInfo } from '../utils/tokens'
 import { useNetwork } from '../context/NetworkContext'
+import { formatTokenBalance } from '../utils/tokenAmounts'
 
 export interface TokenBalance {
   raw: bigint | undefined
@@ -48,8 +49,8 @@ export function useTokenBalance(
   }
 
   const formatted = amount
-    ? (amount.raw > 0n && amount.raw < 10_000n ? amount.toFixed(4) : amount.toFixed(2))
-    : '0.00'
+    ? formatTokenBalance(amount, token)
+    : token.symbol === 'cirBTC' ? '0.00000000' : '0.00'
 
   return {
     raw: typeof data === 'bigint' ? data : undefined,

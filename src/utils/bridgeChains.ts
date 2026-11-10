@@ -12,6 +12,13 @@ export interface BridgeChain {
   isTestnet: boolean
 }
 
+/** The secondary network always belongs to the active Arc environment. */
+export function getSecondaryChainId(arcChainId: number): number {
+  if (arcChainId === arc.id) return base.id
+  if (arcChainId === arcTestnet.id) return baseSepolia.id
+  throw new Error('Choose an Arc network to view its secondary chain.')
+}
+
 export function getBridgeChain(chainId: number): BridgeChain {
   const chain = [arc, arcTestnet, base, baseSepolia].find(c => c.id === chainId)
   if (!chain) throw new Error('This bridge network is not supported.')

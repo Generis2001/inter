@@ -19,7 +19,7 @@ function TxItem({ tx }: { tx: ArcTransaction }) {
   const isContract = tx.direction === 'contract'
   const kind = transactionKind(tx)
   const isSwap = kind === 'swap'
-  const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
+  const displayVal = sanitizeTxValue(tx.value, tx.rawValue, tx.tokenSymbol)
 
   const title = kind === 'bridge' ? (tx.method ?? 'Bridge') : kind === 'transfer' ? (isSent ? 'Sent' : 'Received') : isSwap
     ? 'Swap'

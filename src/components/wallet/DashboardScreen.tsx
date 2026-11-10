@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
 import { TransactionIcon } from '../shared/TransactionIcon'
 import { transactionKind } from '../../utils/transactionPresentation'
+import { SecondaryChainBalances } from './SecondaryChainBalances'
 
 interface DashboardScreenProps {
   onNavigate: (screen: string) => void
@@ -42,7 +43,7 @@ function TxRow({ tx, chainId }: { tx: ArcTransaction; chainId: number }) {
   const isPending = tx.status === 'pending'
   const kind = transactionKind(tx)
   const isSwap = kind === 'swap'
-  const displayVal = sanitizeTxValue(tx.value, tx.rawValue)
+  const displayVal = sanitizeTxValue(tx.value, tx.rawValue, tx.tokenSymbol)
 
   const title = kind === 'bridge' ? (tx.method ?? 'Bridge') : kind === 'transfer' ? (isSent ? 'Sent' : 'Received') : isSwap
     ? 'Swap'
@@ -165,8 +166,10 @@ export function DashboardScreen({
   const address = account?.address
   const usdc = TOKENS[0]
   const eurc = TOKENS[1]
-  const { formatted: usdcFormatted, isLoading: usdcLoading } = useTokenBalance(usdc, address)
-  const { formatted: eurcFormatted, isLoading: eurcLoading } = useTokenBalance(eurc, address)
+  const cirbtc = TOKENS[2]
+  const { formatted: usdcFormatted, isLoading: usdcLoading, isError: usdcError } = useTokenBalance(usdc, address)
+  const { formatted: eurcFormatted, isLoading: eurcLoading, isError: eurcError } = useTokenBalance(eurc, address)
+  const { formatted: cirbtcFormatted, isLoading: cirbtcLoading, isError: cirbtcError } = useTokenBalance(cirbtc, address)
   const txLoading = isLoading
   const recentTxnsTyped: ArcTransaction[] = transactions.slice(0, 6)
   const [copied, setCopied] = useState(false)
@@ -246,7 +249,7 @@ export function DashboardScreen({
 
           <div className="relative z-10 flex flex-col items-center text-center">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--subtle)' }}>
-              Total Portfolio Balance
+              Arc stablecoin value
             </span>
 
             {/* Big Net Worth Value */}
@@ -282,7 +285,7 @@ export function DashboardScreen({
               }}
             >
               <TrendingUp className="size-3.5" />
-              <span>StablEcoin native</span>
+              <span>USDC for gas</span>
             </div>
 
             {/* Quick Action Hub: Send, Receive, History */}
@@ -415,15 +418,21 @@ export function DashboardScreen({
             animate={{ opacity: 1, y: 0 }}
             className="space-y-2.5"
           >
+            <div className="flex items-center justify-between px-1 pb-1">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--subtle)' }}>Arc assets</p>
+              <button onClick={() => onNavigate('assets')} className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>View assets</button>
+            </div>
             {[
-              { token: usdc, formatted: usdcFormatted, loading: usdcLoading, approxUsd: usdcFormatted },
+              { token: usdc, formatted: usdcFormatted, loading: usdcLoading, error: usdcError, approxUsd: usdcFormatted },
               {
                 token: eurc,
                 formatted: eurcFormatted,
                 loading: eurcLoading,
+                error: eurcError,
                 approxUsd: (parseFloat(eurcFormatted?.replace(/,/g, '') || '0') * 1.08).toFixed(2),
               },
-            ].map(({ token, formatted, loading, approxUsd }) => (
+              { token: cirbtc, formatted: cirbtcFormatted, loading: cirbtcLoading, error: cirbtcError, approxUsd: undefined },
+            ].map(({ token, formatted, loading, error, approxUsd }) => (
               <div
                 key={token.symbol}
                 className="flex items-center gap-3.5 rounded-2xl p-4 transition-all hover:scale-[1.01]"
@@ -439,7 +448,7 @@ export function DashboardScreen({
                     className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full text-[9px] font-bold text-white shadow"
                     style={{ background: 'var(--accent)' }}
                   >
-                    {token.symbol === 'USDC' ? '$' : '€'}
+                    {token.sign}
                   </span>
                 </div>
 
@@ -456,26 +465,29 @@ export function DashboardScreen({
                     </span>
                   </div>
                   <p className="text-xs font-medium" style={{ color: 'var(--subtle)' }}>
-                    {token.symbol} · ${token.symbol === 'USDC' ? '1.00' : '1.08'}
+                    {token.symbol}{token.symbol === 'cirBTC' ? ' · Bitcoin on Arc' : ` · ≈ $${token.symbol === 'USDC' ? '1.00' : '1.08'}`}
                   </p>
                 </div>
 
                 <div className="text-right">
                   {loading ? (
                     <Skeleton className="ml-auto h-5 w-20 rounded-md" />
+                  ) : error ? (
+                    <p className="text-xs" style={{ color: 'var(--danger)' }}>Balance unavailable</p>
                   ) : (
                     <>
                       <p className="amount-text text-base font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
                         {formatted}
                       </p>
                       <p className="text-xs font-medium tabular-nums" style={{ color: 'var(--subtle)' }}>
-                        ≈ ${approxUsd}
+                        {approxUsd === undefined ? token.symbol : `≈ $${approxUsd}`}
                       </p>
                     </>
                   )}
                 </div>
               </div>
             ))}
+            <SecondaryChainBalances onBridge={() => onNavigate('bridge')} />
           </motion.div>
         )}
 
@@ -509,7 +521,7 @@ export function DashboardScreen({
                   No transactions yet
                 </p>
                 <p className="mt-1 text-xs" style={{ color: 'var(--subtle)' }}>
-                  Receive USDC or EURC on Arc to see your activity here
+                  Receive assets on Arc to see your activity here
                 </p>
               </div>
             ) : (

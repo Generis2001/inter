@@ -5,7 +5,7 @@
 import { createPublicClient, createWalletClient, http, type CustomTransport } from 'viem'
 import { getBridgeChain } from './bridgeChains'
 import { requireChain } from '../onchain-facts'
-import { TOKENS, getTokens } from './tokens'
+import { getTokenByAddress, getTokens } from './tokens'
 import { recordTransaction } from '../hooks/useArcTransactions'
 import { Amount } from '@/onchain-money'
 
@@ -171,9 +171,7 @@ export async function fetchActiveAllowances(
     const key = `${rec.chainId}_${rec.tokenAddress.toLowerCase()}_${rec.spenderAddress.toLowerCase()}`
     if (!seen.has(key)) {
       seen.add(key)
-      const token = TOKENS.find(
-        (t) => t.address.toLowerCase() === rec.tokenAddress.toLowerCase(),
-      )
+      const token = getTokenByAddress(rec.tokenAddress)
       candidates.push({
         chainId: rec.chainId,
         tokenAddress: rec.tokenAddress,
@@ -203,7 +201,7 @@ export async function fetchActiveAllowances(
           const isUnlimited = allowance >= 10n ** 24n
           const formatted = isUnlimited
             ? 'Unlimited'
-            : `${Amount.fromRaw(allowance, cand.tokenDecimals).toFixed(2)} ${cand.tokenSymbol}`
+            : `${Amount.fromRaw(allowance, cand.tokenDecimals).toFixed(tokenDecimalsForDisplay(cand.tokenSymbol, cand.tokenDecimals))} ${cand.tokenSymbol}`
 
           results.push({
             chainId: cand.chainId,
@@ -224,6 +222,10 @@ export async function fetchActiveAllowances(
   )
 
   return results
+}
+
+function tokenDecimalsForDisplay(symbol: string, decimals: number): number {
+  return symbol.toLowerCase() === 'cirbtc' ? decimals : 2
 }
 
 /**

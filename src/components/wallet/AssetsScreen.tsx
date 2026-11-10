@@ -13,6 +13,7 @@ import { useNetwork } from '../../context/NetworkContext'
 import { ArrowUpRight, ArrowDownLeft, Copy, Check, ChevronRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { SecondaryChainBalances } from './SecondaryChainBalances'
 
 // ─── Asset Detail ─────────────────────────────────────────────────────────────
 
@@ -23,13 +24,13 @@ interface AssetDetailProps {
 }
 
 function AssetDetail({ token, onBack, address }: AssetDetailProps) {
-  const { formatted, isLoading } = useTokenBalance(token, address)
+  const { formatted, isLoading, isError } = useTokenBalance(token, address)
   const { transactions, isLoading: txLoading } = useArcTransactions(address)
   const [copied, setCopied] = useState(false)
-  const { chain, chainId } = useNetwork()
+  const { chain, chainId, isTestnet } = useNetwork()
 
   const assetTxns: ArcTransaction[] = transactions
-    .filter((tx) => tx.tokenSymbol === token.symbol && parseFloat(sanitizeTxValue(tx.value, tx.rawValue)) > 0)
+    .filter((tx) => tx.tokenSymbol === token.symbol && parseFloat(sanitizeTxValue(tx.value, tx.rawValue, tx.tokenSymbol)) > 0)
     .slice(0, 20)
 
   const contractAddress = getTokenAddress(token.symbol, chainId)
@@ -76,6 +77,8 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
 
         {isLoading ? (
           <Skeleton className="h-10 w-36" />
+        ) : isError ? (
+          <p className="text-sm" style={{ color: 'var(--danger)' }}>Balance unavailable</p>
         ) : (
           <div className="flex items-baseline gap-1.5">
             <span className="display text-4xl font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
@@ -88,7 +91,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
         )}
 
         <p className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>
-          1 {token.symbol} = {token.sign}1.00
+          {token.symbol === 'cirBTC' ? (isTestnet ? 'Testnet cirBTC' : 'Bitcoin on Arc') : `1 ${token.symbol} ≈ ${token.sign}1.00`}
         </p>
       </GlassCard>
 
@@ -200,7 +203,7 @@ function AssetDetail({ token, onBack, address }: AssetDetailProps) {
                       className="display text-sm font-bold tabular-nums"
                       style={{ color: tx.status === 'failed' ? 'var(--danger)' : isSent ? 'var(--ink)' : 'var(--success)' }}
                     >
-                      {isSent ? '-' : '+'}{sanitizeTxValue(tx.value, tx.rawValue)}
+                      {isSent ? '-' : '+'}{sanitizeTxValue(tx.value, tx.rawValue, tx.tokenSymbol)}
                     </span>
                   </a>
                 )
@@ -224,7 +227,7 @@ function AssetRow({
   address: `0x${string}` | undefined
   onClick: () => void
 }) {
-  const { formatted, isLoading } = useTokenBalance(token, address)
+  const { formatted, isLoading, isError } = useTokenBalance(token, address)
 
   return (
     <button
@@ -243,6 +246,8 @@ function AssetRow({
       <div className="text-right shrink-0">
         {isLoading ? (
           <Skeleton className="h-4 w-20" />
+        ) : isError ? (
+          <p className="text-xs" style={{ color: 'var(--danger)' }}>Balance unavailable</p>
         ) : (
           <p className="display text-sm font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
             {token.sign}{formatted}
@@ -257,19 +262,19 @@ function AssetRow({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export function AssetsScreen() {
+export function AssetsScreen({ onBridge }: { onBridge?: () => void }) {
   const { account } = useWallet()
-  const { isTestnet } = useNetwork()
+  const { isTestnet, chainId } = useNetwork()
   const address = account?.address
   const [activeToken, setActiveToken] = useState<TokenInfo | null>(null)
 
-  // Compute portfolio total (sum of all token balances)
+  // Keep the estimate scoped to Arc stablecoins; cirBTC and Base ETH have their own units.
   const { formatted: usdcFormatted, amount: usdcAmt } = useTokenBalance(TOKENS[0], address)
   const { amount: eurcAmt } = useTokenBalance(TOKENS[1], address)
   const totalUsd = (() => {
     if (!usdcAmt || !eurcAmt) return usdcFormatted
     try {
-      return usdcAmt.add(eurcAmt).toFixed(2)
+      return usdcAmt.add(eurcAmt.mul(108n).div(100n)).toFixed(2)
     } catch {
       return usdcFormatted
     }
@@ -291,7 +296,7 @@ export function AssetsScreen() {
         <AnimatePresence mode="wait">
           {activeToken ? (
             <AssetDetail
-              key={`detail-${activeToken.symbol}`}
+              key={`detail-${chainId}-${activeToken.symbol}`}
               token={activeToken}
               onBack={() => setActiveToken(null)}
               address={address}
@@ -306,7 +311,7 @@ export function AssetsScreen() {
               {/* Portfolio total */}
               <GlassCard className="mb-4 p-5">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--subtle)' }}>
-                  Total Portfolio Value
+                  Arc stablecoin value
                 </p>
                 <div className="flex items-baseline gap-1.5">
                   <span className="display text-4xl font-bold tabular-nums" style={{ color: 'var(--ink)' }}>
@@ -317,7 +322,7 @@ export function AssetsScreen() {
                   </span>
                 </div>
                 <p className="mt-1 text-xs" style={{ color: 'var(--subtle)' }}>
-                  Stablecoins, 1:1 with USD
+                  Estimated USDC and EURC value in USD
                 </p>
               </GlassCard>
 
@@ -325,7 +330,7 @@ export function AssetsScreen() {
               <GlassCard>
                 <div className="px-4 py-3">
                   <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
-                    Your Assets
+                    Arc assets
                   </p>
                 </div>
                 <div className="border-t p-1" style={{ borderColor: 'var(--border)' }}>
@@ -339,6 +344,7 @@ export function AssetsScreen() {
                   ))}
                 </div>
               </GlassCard>
+              <SecondaryChainBalances onBridge={onBridge} />
             </motion.div>
           )}
         </AnimatePresence>

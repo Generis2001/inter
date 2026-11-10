@@ -11,6 +11,10 @@ The Swap tab now contains Swap and Bridge modes; the home screen also has a Brid
 
 Only USDC and same-environment routes are supported. Tokens must be held at the same Inter wallet address on the source chain. The first release has no external-wallet source connection or custom destination address.
 
+Home and Assets show a Secondary chain section below the Arc assets. Arc mainnet selects Base (8453); Arc Testnet selects Base Sepolia (84532). This section reads native ETH (18 decimals) and the network's ERC-20 USDC (6 decimals) at the same Inter address through the Tower proxy. The balance query is shared with the bridge, verifies the RPC chain ID, refreshes every 20 seconds, and isolates cached results by chain and wallet. Failed reads display Balance unavailable instead of a zero balance.
+
+The Arc token list also includes cirBTC balances, receive/send selection, asset details, and transfer history. cirBTC is separate from the USDC-only bridge and USDC/EURC swaps. See [token configuration and sources](assets-and-secondary-chains.md).
+
 ## Execution and recovery
 
 Tower's authenticated Node RPC supplies route checks, balances, estimates, simulation, transaction submission, and receipts. Circle CCTP V2 supplies the USDC burn/mint contracts and attestations. This implementation does **not** execute Tower's `/api/public/bridge` REST operation: its documented contract does not provide the local-wallet unsigned transaction and recovery interfaces Inter needs.

@@ -251,7 +251,7 @@ function WalletApp() {
           {activeTab === 'assets' && (
             <motion.div key="assets" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
               <ErrorBoundary fallbackTitle="Assets Error">
-                <AssetsScreen />
+                <AssetsScreen onBridge={() => handleNavigate('bridge')} />
               </ErrorBoundary>
             </motion.div>
           )}

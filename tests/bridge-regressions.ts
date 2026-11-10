@@ -5,12 +5,16 @@ import { concatHex, padHex, toHex, type Address } from 'viem'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { getRecordedTransactions, recordTransaction, transactionHistoryKey, type ArcTransaction } from '../src/utils/transactionHistory'
-import { getBridgeChain, validateBridgeRoute } from '../src/utils/bridgeChains'
+import { getBridgeChain, getSecondaryChainId, validateBridgeRoute } from '../src/utils/bridgeChains'
 import { getBridgeOperations, saveBridgeOperation, type BridgeOperation } from '../src/utils/bridgeHistory'
 import { validateAttestedMessage, transactionGasBudget, ZERO_BYTES32 } from '../src/services/cctp'
 import { transactionKind } from '../src/utils/transactionPresentation'
 import { TransactionIcon } from '../src/components/shared/TransactionIcon'
 import { encryptVault, decryptVault } from '../src/utils/vault'
+import { Amount } from '../src/onchain-money'
+import { getTokens, getTokenAddress, CIRBTC_MAINNET_ADDRESS, CIRBTC_TESTNET_ADDRESS } from '../src/utils/tokens'
+import { formatTokenBalance } from '../src/utils/tokenAmounts'
+import { formatTransactionValue, sanitizeTxValue } from '../src/hooks/useArcTransactions'
 
 const values = new Map<string, string>()
 Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) } })
@@ -53,6 +57,34 @@ test('bridge pairs have distinct mainnet/testnet tokens and cannot mix environme
   assert.equal(getBridgeChain(8453).domain, 6)
   assert.notEqual(getBridgeChain(8453).usdc, getBridgeChain(84532).usdc)
   assert.notEqual(getBridgeChain(5042).messenger, getBridgeChain(5042002).messenger)
+})
+
+test('secondary-chain balances use Base and Base Sepolia in their respective Arc environments', () => {
+  assert.equal(getSecondaryChainId(5042), 8453)
+  assert.equal(getSecondaryChainId(5042002), 84532)
+  assert.throws(() => getSecondaryChainId(8453))
+  assert.equal(getBridgeChain(getSecondaryChainId(5042)).usdc.toLowerCase(), '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913')
+  assert.equal(getBridgeChain(getSecondaryChainId(5042002)).usdc.toLowerCase(), '0x036cbd53842c5426634e7929541ec2318f3dcf7e')
+  for (const id of [8453, 84532]) assert.equal(getBridgeChain(id).chain.nativeCurrency.decimals, 18)
+})
+
+test('cirBTC uses the verified deployment for each Arc network and preserves satoshis', () => {
+  for (const [chainId, address] of [[5042, CIRBTC_MAINNET_ADDRESS], [5042002, CIRBTC_TESTNET_ADDRESS]] as const) {
+    const token = getTokens(chainId).find(asset => asset.symbol === 'cirBTC')!
+    assert.equal(token.address, address)
+    assert.equal(getTokenAddress('cirBTC', chainId), address)
+    assert.equal(token.decimals, 8)
+    assert.equal(formatTokenBalance(Amount.fromRaw(1n, token.decimals), token), '0.00000001')
+    assert.equal(formatTransactionValue(100_000_000n, 'cirBTC', address), '1.00000000')
+    assert.equal(sanitizeTxValue('0.00', 1n, 'cirBTC'), '0.00000001')
+    assert.equal(sanitizeTxValue('0.00', 100_000_000_000_000n, 'cirBTC'), '1000000.00000000')
+    assert.equal(Amount.parse('0.00000001', token.decimals).raw, 1n)
+    const icon = renderToStaticMarkup(createElement(TransactionIcon, { tx: { ...row(1), tokenSymbol: 'cirBTC', rawValue: 1n }, size: 34 }))
+    assert.match(icon, /cirBTC logo/)
+    assert.doesNotMatch(icon, /USDC logo|EURC logo/)
+  }
+  assert.notEqual(CIRBTC_MAINNET_ADDRESS.toLowerCase(), CIRBTC_TESTNET_ADDRESS.toLowerCase())
+  assert.equal(formatTokenBalance(Amount.fromRaw(1n, 6), getTokens(5042)[0]), '0.000001')
 })
 
 // Independently encode the published CCTP V2 header and burn message fields.

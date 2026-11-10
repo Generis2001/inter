@@ -1,12 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { erc20Abi, formatUnits } from 'viem'
+import { formatUnits } from 'viem'
 import { ArrowDownLeft, ArrowUpRight, ArrowDown, Check, Loader2, ExternalLink, RefreshCw, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 import { useWallet } from '../../context/WalletContext'
 import { useNetwork } from '../../context/NetworkContext'
 import { useBridge } from '../../context/BridgeContext'
-import { bridgeClient, getBridgeChain } from '../../utils/bridgeChains'
+import { getBridgeChain, getSecondaryChainId } from '../../utils/bridgeChains'
+import { useBridgeChainBalances } from '../../hooks/useBridgeChainBalances'
 import { isBridgePending, type BridgeOperation } from '../../utils/bridgeHistory'
 import { estimateBridge, estimateReceiving, type BridgeEstimate, type ReceivingEstimate } from '../../services/cctp'
 import { Amount } from '../../onchain-money'
@@ -31,7 +31,7 @@ type Review = { quote: BridgeEstimate; existingId?: string } | { operation: Brid
 
 export function BridgeScreen() {
   const { account } = useWallet()
-  const { chainId, isTestnet } = useNetwork()
+  const { chainId } = useNetwork()
   const bridge = useBridge()
   const [requirePin] = useRequireTxPin()
   const [direction, setDirection] = useState<'in' | 'out'>('in')
@@ -44,7 +44,7 @@ export function BridgeScreen() {
   const [pinOpen, setPinOpen] = useState(false)
   const [checkingReceive, setCheckingReceive] = useState(false)
   const generation = useRef(0)
-  const externalId = isTestnet ? 84532 : 8453
+  const externalId = getSecondaryChainId(chainId)
   const sourceId = direction === 'in' ? externalId : chainId
   const destinationId = direction === 'in' ? chainId : externalId
   const source = getBridgeChain(sourceId)
@@ -54,18 +54,7 @@ export function BridgeScreen() {
   const currentScope = useRef(scope)
   useLayoutEffect(() => { currentScope.current = scope }, [scope])
 
-  const balances = useQuery({
-    queryKey: ['bridge-balance', account?.address, sourceId], enabled: !!account,
-    queryFn: async () => {
-      if (!account) throw new Error('Unlock your wallet.')
-      const client = bridgeClient(sourceId)
-      const [raw, native, gasPrice] = await Promise.all([
-        client.readContract({ address: source.usdc, abi: erc20Abi, functionName: 'balanceOf', args: [account.address] }),
-        client.getBalance({ address: account.address }), client.getGasPrice(),
-      ])
-      return { raw, native, gasPrice }
-    }, retry: false, refetchInterval: 20_000,
-  })
+  const balances = useBridgeChainBalances(sourceId, account?.address)
 
   // Quote state synchronizes with the external network and a cancellable request.
   /* oxlint-disable react/set-state-in-effect */

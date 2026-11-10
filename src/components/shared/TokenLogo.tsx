@@ -2,10 +2,13 @@
  * Official token logos sourced from CoinGecko.
  * USDC: https://coin-images.coingecko.com/coins/images/6319/large/USDC.png
  * EURC: https://coin-images.coingecko.com/coins/images/26045/large/EURC.png
+ * cirBTC: https://coin-images.coingecko.com/coins/images/102172745/large/cirbtc.jpg
  */
+import cirbtcLogo from '../../assets/cirbtc.jpg'
+import type { TokenSymbol } from '../../utils/tokens'
 
 interface TokenLogoProps {
-  symbol: 'USDC' | 'EURC'
+  symbol: TokenSymbol | 'ETH'
   size?: number
   className?: string
 }
@@ -13,6 +16,8 @@ interface TokenLogoProps {
 const LOGO_URLS: Record<string, string> = {
   USDC: 'https://coin-images.coingecko.com/coins/images/6319/large/USDC.png',
   EURC: 'https://coin-images.coingecko.com/coins/images/26045/large/EURC.png',
+  cirBTC: cirbtcLogo,
+  ETH: 'https://coin-images.coingecko.com/coins/images/279/large/ethereum.png',
 }
 
 export function TokenLogo({ symbol, size = 40, className = '' }: TokenLogoProps) {
@@ -43,8 +48,8 @@ export function TokenLogoFallback({
   size = 40,
   className = '',
 }: TokenLogoProps) {
-  const bg = symbol === 'USDC' ? '#2775CA' : '#0075c9'
-  const label = symbol === 'EURC' ? '€' : '$'
+  const bg = symbol === 'cirBTC' ? '#1c1c1c' : symbol === 'ETH' ? '#627eea' : '#2775CA'
+  const label = symbol === 'cirBTC' ? '₿' : symbol === 'ETH' ? 'Ξ' : symbol === 'EURC' ? '€' : '$'
 
   return (
     <div
@@ -67,8 +72,8 @@ export function TokenLogoFallback({
 export function TokenIcon({ symbol, size = 40, className = '' }: TokenLogoProps) {
   return (
     <div className={`relative inline-block ${className}`} style={{ width: size, height: size }}>
-      <TokenLogo symbol={symbol} size={size} />
-      <TokenLogoFallback symbol={symbol} size={size} className="absolute inset-0" />
+      <TokenLogo key={symbol} symbol={symbol} size={size} />
+      <TokenLogoFallback key={`${symbol}-fallback`} symbol={symbol} size={size} className="absolute inset-0" />
     </div>
   )
 }

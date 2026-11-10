@@ -8,7 +8,7 @@ This is the **project memory** - what Arc Studio remembers about building this a
 
 ## What This App Does
 
-Inter is a self-custodial Arc wallet for USDC/EURC transfers, swaps, activity, Arc names, and USDC bridging into and out of Arc on mainnet and testnet.
+Inter is a self-custodial Arc wallet for USDC/EURC/cirBTC balances and transfers, stablecoin swaps, activity, Arc names, and USDC bridging into and out of Arc on mainnet and testnet. Its secondary-chain section shows Base ETH and USDC on mainnet, or Base Sepolia ETH and USDC on testnet.
 
 ## Tech Stack
 
@@ -17,7 +17,7 @@ Inter is a self-custodial Arc wallet for USDC/EURC transfers, swaps, activity, A
 - Contracts: Solidity 0.8.28 + Foundry. Sources in `contracts/`, unit tests in `contracts/test/*.t.sol`. Build with `bun run contracts:build` (`forge build`), test with `bun run contracts:test` (`forge test`).
 - Wallet: local viem account from an encrypted vault; PIN/password unlock and optional transaction PIN. Do not substitute an injected wallet flow.
 - Chains: Arc Mainnet (5042) and Arc Testnet (5042002), selected by `NetworkContext`.
-- Tokens: USDC/ERC-20 (6 decimals), native gas USDC (18 decimals), and EURC (6 decimals). Use the network-specific token registry.
+- Tokens: USDC/ERC-20 (6 decimals), native gas USDC (18 decimals), EURC (6 decimals), and cirBTC (8 decimals). Use the network-specific token registry. cirBTC uses different verified mainnet/testnet addresses; its CoinGecko logo is bundled in `src/assets/cirbtc.jpg`.
 - Bridge: Arc ↔ Base (8453), Arc Testnet ↔ Base Sepolia (84532), via locally signed Circle CCTP V2 and Tower RPC. Standard settlement needs a manually confirmed receiving transaction and gas on both networks.
 - Toasts: Sonner
 
@@ -27,6 +27,7 @@ Inter is a self-custodial Arc wallet for USDC/EURC transfers, swaps, activity, A
 - `src/components/` - UI components
 - `src/config.ts` - wagmi config (chains, connectors, transports)
 - `src/context/BridgeContext.tsx` - signing and durable bridge recovery, mounted above screens
+- `src/hooks/useBridgeChainBalances.ts`, `src/components/wallet/SecondaryChainBalances.tsx` - shared, wallet/chain-scoped Base and Base Sepolia balances used by holdings and the bridge
 - `src/services/cctp.ts` - CCTP route/fee checks and attestation validation
 - `src/utils/bridgeHistory.ts` - persist signed transaction/hash before broadcast; retries must use identical bytes
 - `src/utils/transactionHistory.ts` - wallet + actual chain ID history; never read untagged mainnet records into testnet

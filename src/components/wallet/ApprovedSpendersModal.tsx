@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNetwork } from '../../context/NetworkContext'
+import { getToken } from '../../utils/tokens'
 
 
 interface ApprovedSpendersModalProps {
@@ -171,7 +172,7 @@ export function ApprovedSpendersModal({ open, onClose }: ApprovedSpendersModalPr
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <TokenIcon symbol={item.tokenSymbol === 'EURC' ? 'EURC' : 'USDC'} size={32} />
+                          <TokenIcon symbol={getToken(item.tokenSymbol)?.symbol ?? 'USDC'} size={32} />
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm font-bold" style={{ color: 'var(--ink)' }}>

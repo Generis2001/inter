@@ -1,5 +1,5 @@
 /**
- * Send USDC or EURC on Arc Mainnet.
+ * Send supported Arc tokens on the selected mainnet or testnet.
  * Signs and broadcasts via the in-memory account from WalletContext.
  * Private key NEVER leaves memory.
  */
@@ -208,7 +208,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
       const maxAmt = balanceAmount.sub(feeAmount)
       setAmountStr(maxAmt.isPositive() ? maxAmt.toFixed(6) : '0')
     } else {
-      setAmountStr(balanceAmount.toFixed(6))
+      setAmountStr(balanceAmount.toString())
     }
   }
 
@@ -254,7 +254,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
         hash,
         from: account.address.toLowerCase() as `0x${string}`,
         to: finalAddress.toLowerCase() as `0x${string}`,
-        value: parsedAmount.toFixed(2),
+        value: parsedAmount.toString(),
         rawValue: parsedAmount.raw,
         tokenSymbol: selectedToken.symbol,
         timestamp: Date.now(),
@@ -265,14 +265,15 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
         txType: 'transfer',
       }, chainId)
 
-      await publicClient.waitForTransactionReceipt({ hash })
+      const receipt = await publicClient.waitForTransactionReceipt({ hash })
+      if (receipt.status !== 'success') throw new Error('Transfer reverted.')
 
       // Update to success upon confirmation
       recordTransaction({
         hash,
         from: account.address.toLowerCase() as `0x${string}`,
         to: finalAddress.toLowerCase() as `0x${string}`,
-        value: parsedAmount.toFixed(2),
+        value: parsedAmount.toString(),
         rawValue: parsedAmount.raw,
         tokenSymbol: selectedToken.symbol,
         timestamp: Date.now(),
@@ -464,7 +465,7 @@ export function SendSheet({ open, onClose, initialToken }: SendSheetProps) {
             {/* Summary rows */}
             <div className="mb-5 overflow-hidden rounded-2xl" style={{ border: '1px solid var(--border)' }}>
               {[
-                { label: 'Sending', value: `${parsedAmount.toFixed(2)} ${selectedToken.symbol}` },
+                { label: 'Sending', value: `${parsedAmount.toString()} ${selectedToken.symbol}` },
                 {
                   label: 'To',
                   value: recipientIsName
