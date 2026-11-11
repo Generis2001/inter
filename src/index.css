@@ -170,16 +170,60 @@ body {
 [data-theme="dark"] .bg-black\/10                { background-color: rgba(255,255,255,0.12) !important; }
 [data-theme="dark"] .divide-y > * + *            { border-color: var(--border) !important; }
 
-/* Sonner toast overrides */
-[data-sonner-toaster] {
-  --normal-bg:     rgba(255, 255, 255, 0.94);
-  --normal-border: rgba(6, 182, 212, 0.18);
-  --normal-text:   #0c1a2e;
+/* Compact notifications, centered above the wallet navigation. */
+.inter-toaster[data-sonner-toaster][data-x-position="center"] {
+  width: min(384px, calc(100% - 32px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  font-family: inherit;
+  pointer-events: none;
 }
-[data-theme="dark"] [data-sonner-toaster] {
-  --normal-bg:     #121724;
-  --normal-border: rgba(255, 255, 255, 0.15);
-  --normal-text:   #ffffff;
+
+.inter-toaster[data-sonner-toaster] [data-sonner-toast][data-styled="true"] {
+  width: fit-content;
+  max-width: 100%;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  padding: 9px 14px;
+  gap: 7px;
+  border-radius: 20px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.inter-toaster [data-sonner-toast][data-visible="true"] {
+  pointer-events: auto;
+}
+
+.inter-toaster [data-title] {
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.inter-toaster [data-icon] {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.inter-toaster [data-icon] svg {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.inter-toaster [data-type="success"] [data-icon] {
+  color: var(--success);
+}
+
+.inter-toaster [data-type="error"] [data-icon] {
+  color: var(--danger);
 }
 
 /* Zerion-style high-contrast dark mode surface overrides (fixes washed-out text and blurred characters) */

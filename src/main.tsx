@@ -19,6 +19,7 @@ import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConnectKitProvider } from 'connectkit'
 import { Toaster } from 'sonner'
+import { Check } from 'lucide-react'
 import { config } from './config'
 import App from './App'
 import { ErrorBoundary } from './components/shared/ErrorBoundary'
@@ -50,7 +51,15 @@ createRoot(document.getElementById('root')!).render(
         <QueryClientProvider client={queryClient}>
           <ConnectKitProvider>
             <App />
-            <Toaster position="top-center" />
+            <Toaster
+              className="inter-toaster"
+              position="bottom-center"
+              offset={{ bottom: 'calc(96px + var(--safe-area-bottom))' }}
+              mobileOffset={{ bottom: 'calc(96px + var(--safe-area-bottom))' }}
+              duration={2800}
+              visibleToasts={1}
+              icons={{ success: <Check size={14} strokeWidth={2.5} /> }}
+            />
           </ConnectKitProvider>
         </QueryClientProvider>
       </WagmiProvider>
