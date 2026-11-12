@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { WalletProvider, useWallet } from './context/WalletContext'
 import { NetworkProvider, useNetwork } from './context/NetworkContext'
 import { LandingScreen } from './components/onboarding/LandingScreen'
@@ -18,7 +18,9 @@ import { SendSheet } from './components/wallet/SendSheet'
 import { ReceiveSheet } from './components/wallet/ReceiveSheet'
 import { NotificationPanel } from './components/wallet/NotificationPanel'
 import { BottomNav, type NavTab } from './components/wallet/BottomNav'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
+import { ScreenTransition } from './components/shared/ScreenTransition'
+import { pageTransition } from './utils/motion'
 import { useArcTransactions } from './hooks/useArcTransactions'
 import { useNotifications } from './hooks/useNotifications'
 import { useArcNSPrimaryName } from './hooks/useArcNSPrimaryName'
@@ -28,12 +30,16 @@ import { ErrorBoundary } from './components/shared/ErrorBoundary'
 import { Bell, PanelRight, Sun, Moon } from 'lucide-react'
 import { getInitialTheme, applyTheme, type Theme } from './utils/theme'
 
+const PAGE_ORDER: NavTab[] = ['home', 'assets', 'swap', 'bridge', 'activity', 'ans', 'settings']
+
 // Inner component so it can access WalletContext
 function WalletApp() {
   const { screen, account } = useWallet()
   const address = account?.address
   const { chainId } = useNetwork()
   const [activeTab, setActiveTab] = useState<NavTab>('home')
+  const [direction, setDirection] = useState(1)
+  const scrollPositions = useRef<Partial<Record<NavTab, number>>>({})
   const [sendOpen, setSendOpen] = useState(false)
   const [receiveOpen, setReceiveOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -57,47 +63,35 @@ function WalletApp() {
   const isUnlocked = screen === 'unlocked'
 
   const handleNavigate = (target: string) => {
-    if (target === 'activity') setActiveTab('activity')
-    if (target === 'assets') setActiveTab('assets')
-    if (target === 'settings') setActiveTab('settings')
-    if (target === 'ans') setActiveTab('ans')
-    if (target === 'bridge') setActiveTab('bridge')
+    const next = PAGE_ORDER.find(tab => tab === target)
+    if (!next || next === activeTab) return
+    const popup = document.documentElement.classList.contains('is-extension-popup')
+    scrollPositions.current[activeTab] = popup ? document.body.scrollTop : window.scrollY
+    setDirection(PAGE_ORDER.indexOf(next) > PAGE_ORDER.indexOf(activeTab) ? 1 : -1)
+    setActiveTab(next)
   }
+
+  useLayoutEffect(() => {
+    if (!isUnlocked) return
+    const top = scrollPositions.current[activeTab] ?? 0
+    if (document.documentElement.classList.contains('is-extension-popup')) document.body.scrollTo({ top, behavior: 'instant' })
+    else window.scrollTo({ top, behavior: 'instant' })
+  }, [activeTab, isUnlocked])
 
   if (!isUnlocked) {
     return (
-      <AnimatePresence mode="wait">
-        {screen === 'landing' && (
-          <motion.div key="landing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <LandingScreen />
-          </motion.div>
-        )}
-        {screen === 'create-mnemonic' && (
-          <motion.div key="create" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
-            <CreateMnemonicScreen />
-          </motion.div>
-        )}
-        {screen === 'verify-mnemonic' && (
-          <motion.div key="verify" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
-            <VerifyMnemonicScreen />
-          </motion.div>
-        )}
-        {screen === 'import-wallet' && (
-          <motion.div key="import" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
-            <ImportWalletScreen />
-          </motion.div>
-        )}
-        {screen === 'setup-pin' && (
-          <motion.div key="setup-pin" initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}>
-            <SetupPinScreen />
-          </motion.div>
-        )}
-        {screen === 'unlock' && (
-          <motion.div key="unlock" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
-            <UnlockScreen />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <div className="relative min-h-dvh overflow-x-clip">
+        <AnimatePresence mode="popLayout" initial={false} custom={screen === 'landing' ? -1 : 1}>
+          <ScreenTransition key={screen} direction={screen === 'landing' ? -1 : 1} name={screen}>
+            {screen === 'landing' && <LandingScreen />}
+            {screen === 'create-mnemonic' && <CreateMnemonicScreen />}
+            {screen === 'verify-mnemonic' && <VerifyMnemonicScreen />}
+            {screen === 'import-wallet' && <ImportWalletScreen />}
+            {screen === 'setup-pin' && <SetupPinScreen />}
+            {screen === 'unlock' && <UnlockScreen />}
+          </ScreenTransition>
+        </AnimatePresence>
+      </div>
     )
   }
 
@@ -197,7 +191,8 @@ function WalletApp() {
 
           {/* Wallet avatar */}
           <button
-            onClick={() => setActiveTab('settings')}
+            onClick={() => handleNavigate('settings')}
+            aria-label="Wallet settings"
             className="flex items-center justify-center rounded-2xl transition-all hover:scale-[1.03] active:scale-[0.97]"
             title={primaryName ?? address ?? ''}
           >
@@ -227,9 +222,10 @@ function WalletApp() {
 
       {/* Page content — offset for fixed header */}
       <div className="pt-14">
-        <AnimatePresence mode="wait" initial={false}>
-          {activeTab === 'home' && (
-            <motion.div key="home" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+        <div className="relative min-h-[calc(100dvh-56px)] overflow-x-clip">
+          <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+            <ScreenTransition key={activeTab === 'bridge' ? 'swap' : activeTab} direction={direction} name={activeTab}>
+              {activeTab === 'home' && (
               <ErrorBoundary fallbackTitle="Dashboard Error">
                 <DashboardScreen
                   onNavigate={handleNavigate}
@@ -239,47 +235,38 @@ function WalletApp() {
                   isLoading={txLoading}
                 />
               </ErrorBoundary>
-            </motion.div>
-          )}
-          {activeTab === 'activity' && (
-            <motion.div key="activity" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
-              <ErrorBoundary fallbackTitle="Activity Error">
+              )}
+              {activeTab === 'activity' && (
+              <ErrorBoundary fallbackTitle="History Error">
                 <ActivityScreen transactions={transactions} isLoading={txLoading} isError={txError} />
               </ErrorBoundary>
-            </motion.div>
-          )}
-          {activeTab === 'assets' && (
-            <motion.div key="assets" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              )}
+              {activeTab === 'assets' && (
               <ErrorBoundary fallbackTitle="Assets Error">
                 <AssetsScreen onBridge={() => handleNavigate('bridge')} />
               </ErrorBoundary>
-            </motion.div>
-          )}
-          {(activeTab === 'swap' || activeTab === 'bridge') && (
-            <motion.div key="swap" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              )}
+              {(activeTab === 'swap' || activeTab === 'bridge') && (
               <ErrorBoundary fallbackTitle="Swap Error">
-                <ExchangeScreen mode={activeTab} onChange={setActiveTab} />
+                <ExchangeScreen mode={activeTab} onChange={handleNavigate} />
               </ErrorBoundary>
-            </motion.div>
-          )}
-          {activeTab === 'ans' && (
-            <motion.div key="ans" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              )}
+              {activeTab === 'ans' && (
               <ErrorBoundary fallbackTitle="ArcNS Error">
                 <AnsScreen />
               </ErrorBoundary>
-            </motion.div>
-          )}
-          {activeTab === 'settings' && (
-            <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+              )}
+              {activeTab === 'settings' && (
               <ErrorBoundary fallbackTitle="Settings Error">
                 <SettingsScreen />
               </ErrorBoundary>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              )}
+            </ScreenTransition>
+          </AnimatePresence>
+        </div>
       </div>
 
-      <BottomNav active={activeTab === 'bridge' ? 'swap' : activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab} onChange={handleNavigate} />
 
       {/* Sheets */}
       <ErrorBoundary fallbackTitle="Send Sheet Error">
@@ -295,11 +282,13 @@ function WalletApp() {
 export default function App() {
   return (
     <ErrorBoundary fallbackTitle="Inter Wallet Encountered an Issue">
-      <NetworkProvider>
-        <WalletProvider>
-          <BridgeProvider><WalletApp /></BridgeProvider>
-        </WalletProvider>
-      </NetworkProvider>
+      <MotionConfig reducedMotion="user" transition={pageTransition}>
+        <NetworkProvider>
+          <WalletProvider>
+            <BridgeProvider><WalletApp /></BridgeProvider>
+          </WalletProvider>
+        </NetworkProvider>
+      </MotionConfig>
     </ErrorBoundary>
   )
 }

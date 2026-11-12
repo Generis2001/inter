@@ -27,7 +27,7 @@ async page => {
     localStorage.setItem('inter_wallet_txs_v2_5042002_'+wallet.toLowerCase(),JSON.stringify([make(903,'2.750000','EURC','sent',5042002)]));
     window.dispatchEvent(new CustomEvent('inter_tx_recorded',{detail:{chainId:5042}}));
   });
-  await page.getByRole('button',{name:'Activity',exact:true}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'History',exact:true}).click();
   await page.getByText('-41.250000 USDC',{exact:true}).waitFor();
   await page.getByText('+12.500000 EURC',{exact:true}).waitFor();
   const logo=await page.getByRole('img',{name:'USDC logo',exact:true}).first().getAttribute('width');
@@ -36,7 +36,7 @@ async page => {
   await page.evaluate(()=>window.dispatchEvent(new CustomEvent('inter_tx_recorded',{detail:{chainId:5042}})));
   await page.getByRole('button',{name:'Home',exact:true}).click();
   await page.getByRole('button',{name:'Switch to Arc Testnet',exact:true}).click();
-  await page.getByRole('button',{name:'Activity',exact:true}).click();
+  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'History',exact:true}).click();
   await page.getByText('-2.750000 EURC',{exact:true}).waitFor();
   await page.waitForTimeout(900);
   if(await page.getByText('-41.250000 USDC',{exact:true}).count()) throw Error('Mainnet record leaked after switching to testnet');

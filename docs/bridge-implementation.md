@@ -1,6 +1,6 @@
 # Inter USDC bridge
 
-The Swap tab now contains Swap and Bridge modes; the home screen also has a Bridge shortcut. Transfers in home activity and full history show a large currency logo next to Sent or Received. Tower swaps retain the Tower logo; bridges and approvals have their own classification.
+Home has Swap and Bridge shortcuts, which open the exchange screen's Swap and Bridge modes. The bottom navigation contains Home, History, ANS, and Settings. Transfers in home activity and full history show a large currency logo next to Sent or Received. Tower swaps retain the Tower logo; bridges and approvals have their own classification.
 
 ## Supported routes
 

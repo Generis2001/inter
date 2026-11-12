@@ -24,6 +24,8 @@ Inter is a self-custodial Arc wallet for USDC/EURC/cirBTC balances and transfers
 ## Key Files
 
 - `src/App.tsx` - Main application logic
+- `src/components/wallet/BottomNav.tsx` - Home, History, ANS, and Settings navigation; Swap and Bridge are Home shortcuts
+- `src/components/shared/ScreenTransition.tsx`, `src/utils/motion.ts` - shared page transitions and motion timing, with reduced-motion support
 - `src/components/` - UI components
 - `src/config.ts` - wagmi config (chains, connectors, transports)
 - `src/context/BridgeContext.tsx` - signing and durable bridge recovery, mounted above screens

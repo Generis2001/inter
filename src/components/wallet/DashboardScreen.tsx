@@ -14,6 +14,7 @@ import { useNetwork } from '../../context/NetworkContext'
 import {
   ArrowUpRight,
   ArrowDownLeft,
+  ArrowLeftRight,
   History,
   Copy,
   Check,
@@ -288,7 +289,7 @@ export function DashboardScreen({
               <span>USDC for gas</span>
             </div>
 
-            {/* Quick Action Hub: Send, Receive, History */}
+            {/* Quick actions keep Exchange accessible from Home. */}
             <div className="mt-6 grid w-full max-w-xs grid-cols-4 gap-3 pt-2 mx-auto">
               {/* 1. Send */}
               <button
@@ -333,9 +334,9 @@ export function DashboardScreen({
                 <div className="flex size-13 items-center justify-center rounded-2xl shadow-sm transition-all group-hover:scale-105 group-active:scale-95" style={{ background: 'var(--surface-muted)', border: '1px solid var(--border)', color: 'var(--accent)' }}><Route className="size-5" /></div>
                 <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>Bridge</span>
               </button>
-              {/* History */}
+              {/* Swap */}
               <button
-                onClick={() => onNavigate('activity')}
+                onClick={() => onNavigate('swap')}
                 className="group flex flex-col items-center gap-1.5 transition-all"
               >
                 <div
@@ -346,10 +347,10 @@ export function DashboardScreen({
                     color: 'var(--ink)',
                   }}
                 >
-                  <History className="size-5 transition-transform group-hover:rotate-12" style={{ color: 'var(--subtle)' }} />
+                  <ArrowLeftRight className="size-5 transition-transform group-hover:translate-x-0.5" style={{ color: 'var(--accent)' }} />
                 </div>
                 <span className="text-xs font-semibold" style={{ color: 'var(--ink)' }}>
-                  History
+                  Swap
                 </span>
               </button>
             </div>
@@ -407,7 +408,7 @@ export function DashboardScreen({
               />
             )}
             <History className="relative z-10 size-4" />
-            <span className="relative z-10">Recent Activity</span>
+            <span className="relative z-10">Recent History</span>
           </button>
         </div>
 
@@ -538,7 +539,7 @@ export function DashboardScreen({
                 className="inline-flex items-center gap-1.5 text-xs font-bold transition-all hover:gap-2"
                 style={{ color: 'var(--accent)' }}
               >
-                <span>View Full Activity Log</span>
+                <span>View full history</span>
                 <ExternalLink className="size-3.5" />
               </button>
             </div>

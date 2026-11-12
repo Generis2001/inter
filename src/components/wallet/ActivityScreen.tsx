@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
+import { selectionSpring } from '../../utils/motion'
 import { PageBackground } from '../shared/PageBackground'
 import { GlassCard } from '../shared/GlassCard'
 import { Skeleton } from '../shared/Skeleton'
@@ -160,6 +162,7 @@ interface ActivityScreenProps {
 }
 
 export function ActivityScreen({ transactions, isLoading = false, isError = false }: ActivityScreenProps) {
+  const reducedMotion = useReducedMotion()
   const [filter, setFilter] = useState<Filter>('all')
 
   const isSwapTx = (tx: ArcTransaction) => transactionKind(tx) === 'swap'
@@ -197,33 +200,36 @@ export function ActivityScreen({ transactions, isLoading = false, isError = fals
         {/* Header */}
         <div className="mb-5">
           <h1 className="display text-xl font-bold" style={{ color: 'var(--ink)' }}>
-            Activity
+            History
           </h1>
           <p className="mt-0.5 text-xs" style={{ color: 'var(--subtle)' }}>
-            Full transaction history categorized by activity type
+            Your transactions, all in one place.
           </p>
         </div>
 
         {/* Filter tabs */}
         <div
+          role="group"
+          aria-label="Filter history"
           className="mb-4 flex gap-1.5 overflow-x-auto rounded-2xl p-1 no-scrollbar"
-          style={{ background: 'rgba(18,45,69,0.06)' }}
+          style={{ background: 'var(--surface-muted)' }}
         >
           {FILTERS.map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setFilter(key)}
-              className="flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all"
+              aria-pressed={filter === key}
+              className="relative flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors"
               style={{
-                background: filter === key ? 'white' : 'transparent',
                 color: filter === key ? 'var(--ink)' : 'var(--subtle)',
-                boxShadow: filter === key ? '0 2px 8px rgba(18,45,69,0.08)' : 'none',
               }}
             >
-              <span>{label}</span>
+              {filter === key && <motion.span layoutId={reducedMotion ? undefined : 'history-filter'}
+                className="absolute inset-0 rounded-xl" style={{ background: 'var(--surface-strong)', boxShadow: '0 2px 6px rgb(0 0 0 / 4%)' }} transition={selectionSpring} />}
+              <span className="relative">{label}</span>
               {counts[key] > 0 && (
                 <span
-                  className="rounded-full px-1.5 py-0.2 text-[10px] font-bold"
+                  className="relative rounded-full px-1.5 py-0.2 text-[10px] font-bold"
                   style={{
                     background: filter === key ? 'rgba(6,182,212,0.14)' : 'rgba(18,45,69,0.06)',
                     color: filter === key ? 'var(--accent)' : 'var(--muted)',
