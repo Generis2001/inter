@@ -20,7 +20,8 @@
     "contracts:build": "forge build",
     "contracts:test": "forge test",
     "tower:serve": "node --env-file=.env server/start.mjs",
-    "test:bridge": "node scripts/test-bridge.mjs && node --test tests/tower-proxy.test.mjs"
+    "test:bridge": "node scripts/test-bridge.mjs && node --test tests/tower-proxy.test.mjs",
+    "test:swap": "node scripts/test-swap.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^6.2.0",

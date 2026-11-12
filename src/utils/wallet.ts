@@ -99,7 +99,8 @@ export function isValidAddress(addr: string): boolean {
 
 /** Parse onchain error into user-friendly message */
 export function parseOnchainError(error: unknown): string {
-  const rawMsg = (error as { message?: string })?.message ?? String(error)
+  const detail = error as { message?: string; shortMessage?: string }
+  const rawMsg = detail?.shortMessage ?? detail?.message ?? String(error)
   const msg = rawMsg.toLowerCase()
 
   if (msg.includes('user rejected') || (error as { code?: number })?.code === 4001) {
@@ -123,13 +124,16 @@ export function parseOnchainError(error: unknown): string {
 
   if (msg.includes('reverted')) {
     const m = rawMsg.match(/reason="([^"]+)"/)
-    return m ? `Transaction failed: ${m[1]}` : 'Transaction failed. Please try again.'
+    const reason = m?.[1] ?? rawMsg.match(/execution reverted:\s*([^\n]+)/i)?.[1]
+    return reason ? `Transaction failed: ${reason.slice(0, 200)}` : 'Transaction failed. Please try again.'
   }
-  if (msg.includes('network') || msg.includes('timeout')) {
+  if (/failed to fetch|fetch failed|http request failed|network error|network request|timeout|timed out/.test(msg)) {
     return 'Network error. Please check your connection and try again.'
   }
   if (msg.includes('nonce')) {
     return 'Transaction nonce error. Please try again.'
   }
-  return 'Something went wrong. Please try again.'
+  // Preserve provider and local validation errors without exposing viem's
+  // multiline transaction dumps, RPC URLs, or stack traces.
+  return rawMsg.split('\n')[0].trim().slice(0, 240) || 'Something went wrong. Please try again.'
 }

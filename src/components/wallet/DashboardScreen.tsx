@@ -18,7 +18,6 @@ import {
   History,
   Copy,
   Check,
-  TrendingUp,
   Coins,
   ExternalLink,
   Route,
@@ -238,6 +237,11 @@ export function DashboardScreen({
             boxShadow: 'var(--glass-shadow)',
           }}
         >
+          {/* Currency signs watermark the balance without competing with it. */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 select-none overflow-hidden">
+            <span className="absolute -left-3 top-1 text-[132px] font-light leading-none" style={{ color: 'var(--accent)', opacity: 0.055, transform: 'rotate(-14deg)' }}>$</span>
+            <span className="absolute -right-2 top-9 text-[148px] font-light leading-none" style={{ color: 'var(--ink)', opacity: 0.045, transform: 'rotate(12deg)' }}>€</span>
+          </div>
           {/* Subtle atmospheric ambient glow */}
           <div
             className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full opacity-20 blur-3xl"
@@ -274,19 +278,6 @@ export function DashboardScreen({
                   </motion.h1>
                 </AnimatePresence>
               )}
-            </div>
-
-            {/* 24h PnL / Live Status Pill */}
-            <div
-              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium"
-              style={{
-                background: 'rgba(16,185,129,0.10)',
-                color: 'var(--success)',
-                border: '1px solid rgba(16,185,129,0.18)',
-              }}
-            >
-              <TrendingUp className="size-3.5" />
-              <span>USDC for gas</span>
             </div>
 
             {/* Quick actions keep Exchange accessible from Home. */}

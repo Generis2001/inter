@@ -23,6 +23,9 @@ export function useBridgeChainBalances(chainId: number, address: Address | undef
       return { raw, native, gasPrice }
     },
     retry: false,
-    refetchInterval: 20_000,
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: 'always',
+    refetchOnReconnect: 'always',
   })
 }

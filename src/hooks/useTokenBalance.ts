@@ -8,6 +8,7 @@ import { Amount } from '@/onchain-money'
 import { getTokenAddress, type TokenInfo } from '../utils/tokens'
 import { useNetwork } from '../context/NetworkContext'
 import { formatTokenBalance } from '../utils/tokenAmounts'
+import { BALANCE_REFRESH_INTERVAL, useWalletBalanceRefresh } from './useWalletBalanceRefresh'
 
 export interface TokenBalance {
   raw: bigint | undefined
@@ -33,9 +34,14 @@ export function useTokenBalance(
     chainId,
     query: {
       enabled: !!address,
-      refetchInterval: 15_000,
+      staleTime: 3_000,
+      refetchInterval: BALANCE_REFRESH_INTERVAL,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: 'always',
+      refetchOnReconnect: 'always',
     },
   })
+  const refresh = useWalletBalanceRefresh(refetch, address, chainId)
 
   let amount: Amount | undefined
   try {
@@ -58,6 +64,6 @@ export function useTokenBalance(
     amount,
     isLoading,
     isError,
-    refetch: () => { void refetch() },
+    refetch: refresh,
   }
 }

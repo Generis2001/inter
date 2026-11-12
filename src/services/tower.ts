@@ -12,7 +12,8 @@ export async function towerRequest<T>(path: string, payload?: unknown, signal?: 
     ...(payload === undefined ? {} : { body: JSON.stringify(payload) }),
     signal: signal ?? AbortSignal.timeout(30_000),
   })
-  const json = await response.json() as T & { error?: string; message?: string; success?: boolean }
+  const json = await response.json() as T & { error?: string; message?: string; success?: boolean; code?: string }
+  if (json.success === false && json.code === 'QUOTE_STALE') throw new Error('The swap quote expired or the route changed. Request a fresh quote.')
   if (!response.ok || json.success === false) throw new Error(json.error ?? json.message ?? 'Tower is unavailable. Please try again.')
   return json
 }

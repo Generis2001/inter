@@ -13,14 +13,15 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react
 import {
   createPublicClient,
   createWalletClient,
-  http,
   parseAbi,
   maxUint256,
   type Address,
 } from 'viem'
 import { arc } from 'viem/chains'
 import { arcTestnet } from '../config'
-import { towerRequest } from '../services/tower'
+import { towerRequest, towerTransport } from '../services/tower'
+import { buildTowerSwapTransaction } from '../services/towerSwap'
+import { useQueryClient } from '@tanstack/react-query'
 import { useWallet } from '../context/WalletContext'
 import { TOKENS, getTokenAddress, type TokenInfo } from '../utils/tokens'
 import { Amount } from '@/onchain-money'
@@ -28,6 +29,7 @@ import { recordTransaction } from './useArcTransactions'
 import { parseOnchainError } from '../utils/wallet'
 import { recordKnownSpender } from '../utils/allowances'
 import { useNetwork } from '../context/NetworkContext'
+import { isWalletBalanceQuery } from '../utils/walletQueries'
 
 
 const ERC20_ABI = parseAbi([
@@ -62,28 +64,6 @@ interface TowerQuoteResponse {
     route?: unknown
     slippageTolerance?: number
     [key: string]: unknown
-  }
-}
-
-interface TowerBuildTxResponse {
-  success: boolean
-  data: {
-    approve?: {
-      to?: string
-      token?: string
-      spender?: string
-      data: string
-      value?: string
-      gasLimit?: string
-      amountRaw?: string
-    }
-    swap: {
-      to: string
-      data: string
-      value: string
-      gasLimit?: string
-      executorAddress?: string
-    }
   }
 }
 
@@ -127,15 +107,6 @@ async function towerQuote(
   return json.data
 }
 
-async function towerBuildTx(
-  quoteData: unknown,
-  userAddress: Address,
-): Promise<TowerBuildTxResponse['data']> {
-  const json = await towerRequest<TowerBuildTxResponse>('/swap/build-tx', { quote: quoteData, userAddress })
-  if (!json.success || !json.data) throw new Error('Build tx failed')
-  return json.data
-}
-
 function parseAmountSafe(str: string, decimals: number): bigint | null {
   if (!str || str === '0' || str === '0.') return null
   try { return Amount.parse(str, decimals).raw }
@@ -145,6 +116,7 @@ function parseAmountSafe(str: string, decimals: number): bigint | null {
 // ---- hook -------------------------------------------------------------------
 
 export function useTowerSwap(slippageBps = 50) {
+  const queryClient = useQueryClient()
   const { account } = useWallet()
   const { isTestnet, chainId } = useNetwork()
   const current = useRef({ account, chainId })
@@ -155,6 +127,7 @@ export function useTowerSwap(slippageBps = 50) {
   const [amountIn, setAmountIn]   = useState('')
   const [swapState, setSwapState] = useState<SwapState>({ status: 'idle' })
   const quoteTimerRef             = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const signing = useRef(false)
 
   const flipTokens = useCallback(() => {
     setTokenIn(tokenOut)
@@ -169,7 +142,7 @@ export function useTowerSwap(slippageBps = 50) {
     if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
     const parsed = parseAmountSafe(amountIn, tokenIn.decimals)
 
-    quoteTimerRef.current = setTimeout(() => {
+    const timer = setTimeout(() => {
       if (!parsed || parsed === 0n) {
         setSwapState({ status: 'idle' })
         return
@@ -194,16 +167,17 @@ export function useTowerSwap(slippageBps = 50) {
           setSwapState({ status: 'error', message: msg })
         })
     }, 400)
+    quoteTimerRef.current = timer
 
     return () => {
       ++quoteGeneration.current
-      if (quoteTimerRef.current) clearTimeout(quoteTimerRef.current)
+      clearTimeout(timer)
     }
   }, [amountIn, tokenIn, tokenOut, slippageBps, chainId])
 
   const executeSwap = useCallback(async (options?: { unlimitedApproval?: boolean }) => {
-    if (!account) return
-    if (swapState.status !== 'quoted') return
+    if (!account || swapState.status !== 'quoted' || signing.current) return
+    signing.current = true
     const { quoteData, amountOut, dexName } = swapState
 
     setSwapState({ status: 'approving' })
@@ -211,11 +185,12 @@ export function useTowerSwap(slippageBps = 50) {
       type ViemAccount = Parameters<typeof createWalletClient>[0] extends { account?: infer A } ? NonNullable<A> : never
       const viemAcct   = account as unknown as ViemAccount
       const network = isTestnet ? arcTestnet : arc
-      const publicClient = createPublicClient({ chain: network, transport: http() })
+      const publicClient = createPublicClient({ chain: network, transport: towerTransport(chainId), pollingInterval: 1_000 })
       const confirmedQuote = quoteData as { quote: unknown; chainId: number; amountRaw: string }
       if (confirmedQuote.chainId !== chainId || confirmedQuote.amountRaw !== parseAmountSafe(amountIn, tokenIn.decimals)?.toString()) throw new Error('Quote changed. Review the swap again.')
       const assertCurrent = () => { if (current.current.chainId !== chainId || current.current.account?.address !== account.address) throw new Error('Wallet or network changed.') }
       assertCurrent()
+      if (await publicClient.getChainId() !== chainId) throw new Error('Swap RPC network mismatch.')
 
       // Pre-flight check on Arc native gas balance before broadcasting
       try {
@@ -228,10 +203,10 @@ export function useTowerSwap(slippageBps = 50) {
         // Proceed if client check fails
       }
 
-      const walletClient  = createWalletClient({ account: viemAcct, chain: network, transport: http() })
+      const walletClient  = createWalletClient({ account: viemAcct, chain: network, transport: towerTransport(chainId) })
 
       // Build tx calldata from Tower
-      const txData = await towerBuildTx(confirmedQuote.quote, account.address)
+      const txData = await buildTowerSwapTransaction(confirmedQuote.quote, account.address, chainId)
 
       // Step 1: Ensure ERC-20 approval for Tower swap executor
       // Note: Tower's approve object provides `token` (the ERC20 contract address) and `spender` (the router/executor)
@@ -252,22 +227,13 @@ export function useTowerSwap(slippageBps = 50) {
         setSwapState({ status: 'approving' })
         const isUnlimited = !!options?.unlimitedApproval
         const approvalAmount = isUnlimited ? maxUint256 : parsedIn
-        const approveData = txData.approve?.data as `0x${string}` | undefined
-
-        const approveTx = isUnlimited && approveData
-          ? await walletClient.sendTransaction({
-              account: viemAcct,
-              to: tokenAddress,
-              data: approveData,
-              value: BigInt(txData.approve?.value ?? '0'),
-            })
-          : await walletClient.writeContract({
-              account: viemAcct,
-              address: tokenAddress,
-              abi: ERC20_ABI,
-              functionName: 'approve',
-              args: [spender, approvalAmount],
-            })
+        const approveTx = await walletClient.writeContract({
+          account: viemAcct,
+          address: tokenAddress,
+          abi: ERC20_ABI,
+          functionName: 'approve',
+          args: [spender, approvalAmount],
+        })
         const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approveTx })
         if (approvalReceipt.status !== 'success') throw new Error('Approval reverted.')
 
@@ -302,8 +268,8 @@ export function useTowerSwap(slippageBps = 50) {
       setSwapState({ status: 'swapping' })
       const txHash = await walletClient.sendTransaction({
         account: viemAcct,
-        to: txData.swap.to as Address,
-        data: txData.swap.data as `0x${string}`,
+        to: txData.swap.to,
+        data: txData.swap.data,
         value: BigInt(txData.swap.value ?? '0'),
       })
 
@@ -347,12 +313,15 @@ export function useTowerSwap(slippageBps = 50) {
         txType: 'swap',
       }, chainId)
 
+      void queryClient.invalidateQueries({ predicate: query => isWalletBalanceQuery(query.queryKey, account.address, chainId) })
       setSwapState({ status: 'success', txHash, amountOut, dexName })
     } catch (err) {
       const clean = parseOnchainError(err)
       setSwapState({ status: 'error', message: clean })
+    } finally {
+      signing.current = false
     }
-  }, [account, swapState, amountIn, tokenIn, chainId, isTestnet])
+  }, [account, swapState, amountIn, tokenIn, chainId, isTestnet, queryClient])
 
   const reset = useCallback(() => {
     setAmountIn('')

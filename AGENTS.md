@@ -30,6 +30,8 @@ Inter is a self-custodial Arc wallet for USDC/EURC/cirBTC balances and transfers
 - `src/config.ts` - wagmi config (chains, connectors, transports)
 - `src/context/BridgeContext.tsx` - signing and durable bridge recovery, mounted above screens
 - `src/hooks/useBridgeChainBalances.ts`, `src/components/wallet/SecondaryChainBalances.tsx` - shared, wallet/chain-scoped Base and Base Sepolia balances used by holdings and the bridge
+- `src/services/towerSwap.ts` - bind the selected chain ID inside Tower's quote when building swaps; the API may omit it from quote responses
+- `src/hooks/useWalletBalanceRefresh.ts`, `src/utils/walletQueries.ts` - stable, wallet/chain-scoped balance refresh after confirmed activity; Arc balances poll every 5 seconds
 - `src/services/cctp.ts` - CCTP route/fee checks and attestation validation
 - `src/utils/bridgeHistory.ts` - persist signed transaction/hash before broadcast; retries must use identical bytes
 - `src/utils/transactionHistory.ts` - wallet + actual chain ID history; never read untagged mainnet records into testnet
@@ -43,7 +45,7 @@ bun install
 bun run dev
 ```
 
-`npm install` / `npm run dev` also work. Validate with `npm run check`, `npm run test:bridge`, and `npm run build`. Tower requires server-side `TOWER_API_KEY`; never put a secret in a `VITE_` variable. Extension/Android builds need `VITE_TOWER_PROXY_URL` pointing to the deployed proxy and an allowed origin.
+`npm install` / `npm run dev` also work. Validate with `npm run check`, `npm run test:bridge`, `npm run test:swap`, and `npm run build`. Tower requires server-side `TOWER_API_KEY`; never put a secret in a `VITE_` variable. Extension/Android builds need `VITE_TOWER_PROXY_URL` pointing to the deployed proxy and an allowed origin.
 
 Every production build refreshes `unpacked-extension/`. Local `INTER_EXTENSION_DIR` can mirror the build into an already installed unpacked Inter folder; keep its path and manifest key to preserve Chrome's extension identity and wallet storage. `npm run extension:watch` rebuilds/syncs on source changes; then Chrome's Reload button reads the updated files. This workspace's ignored local env points to the existing Windows installation, so builds need permission to write that directory outside the workspace sandbox.
 

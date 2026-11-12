@@ -3,7 +3,7 @@
  * Tower Exchange (primary) or Uniswap v4 Universal Router (secondary).
  * Features: adjustable slippage, Tower logo branding, route details.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSwap, type SwapRoute } from '../../hooks/useSwap'
 import { useTokenBalance } from '../../hooks/useTokenBalance'
@@ -32,6 +32,9 @@ import { BottomSheet } from '../shared/BottomSheet'
 import { PinVerificationModal } from '../shared/PinVerificationModal'
 import { useRequireTxPin } from '../../utils/securitySettings'
 import { useNetwork } from '../../context/NetworkContext'
+import { BALANCE_REFRESH_INTERVAL } from '../../hooks/useWalletBalanceRefresh'
+import { isWalletBalanceQuery } from '../../utils/walletQueries'
+import { formatUnits } from 'viem'
 
 
 const SLIPPAGE_PRESETS = [0.1, 0.3, 0.5, 1.0]
@@ -59,18 +62,23 @@ export function SwapScreen() {
   } = useSwap()
 
   const queryClient = useQueryClient()
-  const { formatted: balanceIn, raw: rawBalanceIn, isLoading: balIn, refetch: refetchIn } = useTokenBalance(tokenIn, account?.address)
-  const { formatted: balanceOut, refetch: refetchOut } = useTokenBalance(tokenOut, account?.address)
-  const { raw: usdcRaw, refetch: refetchUsdc } = useTokenBalance(TOKENS[0], account?.address)
+  const { formatted: balanceIn, raw: rawBalanceIn, isLoading: balIn } = useTokenBalance(tokenIn, account?.address)
+  const { formatted: balanceOut } = useTokenBalance(tokenOut, account?.address)
+  const { raw: usdcRaw } = useTokenBalance(TOKENS[0], account?.address)
 
-  const { chainId, isTestnet } = useNetwork()
+  const { chainId } = useNetwork()
 
   // Native Arc gas token balance (18 decimals USDC)
-  const { data: nativeBalance, refetch: refetchNative } = useBalance({
+  const { data: nativeBalance } = useBalance({
     address: account?.address,
     chainId,
+    query: { enabled: !!account, refetchInterval: BALANCE_REFRESH_INTERVAL },
   })
-  const { data: gasPrice } = useGasPrice({ chainId })
+  const { data: gasPrice } = useGasPrice({ chainId, query: { refetchInterval: BALANCE_REFRESH_INTERVAL } })
+  const walletAddress = account?.address
+  const refreshBalances = useCallback(() => {
+    if (walletAddress) void queryClient.invalidateQueries({ predicate: query => isWalletBalanceQuery(query.queryKey, walletAddress, chainId) })
+  }, [queryClient, walletAddress, chainId])
 
   // Slippage settings panel state
   const [showSlippage, setShowSlippage] = useState(false)
@@ -114,30 +122,19 @@ export function SwapScreen() {
     }
   }, [slippageBps])
 
-  // Invalidate and refresh all balance queries across the wallet immediately on swap completion
+  // Refresh this wallet/network immediately, then retry briefly for RPC replicas.
+  // Stable dependencies keep renders from restarting this effect or its timers.
   useEffect(() => {
     if (swapState.status === 'success') {
-      void queryClient.invalidateQueries()
-      void refetchIn()
-      void refetchOut()
-      void refetchUsdc()
-      void refetchNative()
-      const t1 = setTimeout(() => {
-        void queryClient.invalidateQueries()
-        void refetchIn()
-        void refetchOut()
-        void refetchUsdc()
-        void refetchNative()
-      }, 1500)
-      const t2 = setTimeout(() => {
-        void queryClient.invalidateQueries()
-      }, 3500)
+      refreshBalances()
+      const t1 = setTimeout(refreshBalances, 1500)
+      const t2 = setTimeout(refreshBalances, 3500)
       return () => {
         clearTimeout(t1)
         clearTimeout(t2)
       }
     }
-  }, [swapState.status, queryClient, refetchIn, refetchOut, refetchUsdc, refetchNative])
+  }, [swapState.status, refreshBalances])
 
   const isQuoting   = swapState.status === 'quoting'
   const isQuoted    = swapState.status === 'quoted'
@@ -154,7 +151,7 @@ export function SwapScreen() {
   // Arc native token is USDC (18 decimals).
   const currentGasPrice = gasPrice ?? 20_000_000_000n
   const minRequiredGasWei = currentGasPrice * 350_000n // ~0.007 USDC in 18 decimals
-  const minRequiredGasUsdcRaw = 7_000n // 0.007 USDC in 6-decimal raw
+  const minRequiredGasUsdcRaw = (minRequiredGasWei + 999_999_999_999n) / 1_000_000_000_000n
 
   const parsedAmountIn = (() => {
     if (!amountIn || amountIn === '0' || amountIn === '0.') return null
@@ -175,14 +172,7 @@ export function SwapScreen() {
   // Gas balance validation (USDC is native fee token on Arc)
   const hasInsufficientGas = (() => {
     if (!account) return false
-    // On Testnet: Testnet operates independently and does not require mainnet USDC or mainnet native gas.
-    if (isTestnet) {
-      if (rawBalanceIn !== undefined && rawBalanceIn === 0n && (nativeBalance === undefined || nativeBalance.value === 0n)) {
-        return true
-      }
-      return false
-    }
-    // Mainnet checks (exact original behaviour preserved):
+    // All balances here are already scoped to the selected Arc network.
     // 1. If native gas balance is loaded and below required threshold
     if (nativeBalance !== undefined && nativeBalance.value < minRequiredGasWei) {
       return true
@@ -205,16 +195,9 @@ export function SwapScreen() {
   const canSwap = isQuoted && !!account && !hasInsufficientGas && !hasInsufficientTokenBalance
 
   const handleMax = () => {
-    if (!balanceIn) return
-    const num = parseFloat(balanceIn.replace(/[^0-9.]/g, ''))
-    if (isNaN(num)) return
-    if (tokenIn.symbol === 'USDC') {
-      // Reserve ~0.007 USDC to cover network transaction gas on Arc
-      const reserved = Math.max(0, num - 0.007)
-      setAmountIn(reserved > 0 ? (reserved < 0.01 ? reserved.toFixed(4) : reserved.toFixed(2)) : '0')
-    } else {
-      setAmountIn(balanceIn.replace(/[^0-9.]/g, ''))
-    }
+    if (rawBalanceIn === undefined) return
+    const reserve = tokenIn.symbol === 'USDC' ? minRequiredGasUsdcRaw : 0n
+    setAmountIn(formatUnits(rawBalanceIn > reserve ? rawBalanceIn - reserve : 0n, tokenIn.decimals))
   }
 
   const handleSlippagePreset = (pct: number) => {
@@ -286,7 +269,7 @@ export function SwapScreen() {
         </a>
         <button
           onClick={() => {
-            void queryClient.invalidateQueries()
+            refreshBalances()
             reset()
           }}
           className="w-full max-w-sm rounded-2xl py-4 text-sm font-semibold text-white"

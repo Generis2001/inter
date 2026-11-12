@@ -139,6 +139,11 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
 
     const addrLower = address.toLowerCase()
     const freshLocal = getRecordedTransactions(address, chainId)
+    if (freshLocal.length > 0 && isCurrent()) {
+      setSnapshot({ scope: requestScope, transactions: freshLocal })
+      transactionsRef.current = freshLocal
+      setIsLoading(false)
+    }
     const freshLocalMap = new Map<string, ArcTransaction>()
     for (const t of freshLocal) freshLocalMap.set(t.hash.toLowerCase(), t)
 
@@ -147,10 +152,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
     // 1. Try Explorer API (with timeout so it never hangs)
     try {
       const explorerApi = `${chain.explorerBase}/api/v2/addresses/${address}/transactions`
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 4000)
-      const res = await fetch(explorerApi, { signal: controller.signal })
-      clearTimeout(timeoutId)
+      const res = await fetch(explorerApi, { signal: AbortSignal.timeout(4000) })
       if (res.ok) {
         const data = await res.json() as { items?: ExplorerTx[] }
         const items = data.items ?? []
@@ -255,6 +257,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       if (rpc) {
         const addrPadded = '0x000000000000000000000000' + address.slice(2).toLowerCase()
         const blockRes = await fetch(rpc, {
+          signal: AbortSignal.timeout(4000),
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }),
@@ -266,6 +269,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
           const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
           const [sentRes, recvRes] = await Promise.all([
             fetch(rpc, {
+              signal: AbortSignal.timeout(4000),
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -276,6 +280,7 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
               }),
             }),
             fetch(rpc, {
+              signal: AbortSignal.timeout(4000),
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -369,9 +374,16 @@ export function useArcTransactions(address: `0x${string}` | undefined) {
       if ((event as CustomEvent<ArcTransaction>).detail?.chainId === chainId) void fetchTxns()
     }
     window.addEventListener('inter_tx_recorded', handleRecorded)
-    const interval = setInterval(() => void fetchTxns(), 25_000)
+    const handleResume = () => { if (document.visibilityState === 'visible') void fetchTxns() }
+    window.addEventListener('focus', handleResume)
+    window.addEventListener('online', handleResume)
+    document.addEventListener('visibilitychange', handleResume)
+    const interval = setInterval(() => { if (document.visibilityState === 'visible') void fetchTxns() }, 10_000)
     return () => {
       window.removeEventListener('inter_tx_recorded', handleRecorded)
+      window.removeEventListener('focus', handleResume)
+      window.removeEventListener('online', handleResume)
+      document.removeEventListener('visibilitychange', handleResume)
       clearInterval(interval)
     }
   /* oxlint-enable react/set-state-in-effect */

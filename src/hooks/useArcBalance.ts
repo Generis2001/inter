@@ -8,6 +8,7 @@ import { erc20Abi } from 'viem'
 import { getUsdc, requireChain } from '@/onchain-facts'
 import { Amount } from '@/onchain-money'
 import { useNetwork } from '../context/NetworkContext'
+import { BALANCE_REFRESH_INTERVAL, useWalletBalanceRefresh } from './useWalletBalanceRefresh'
 
 export interface ArcBalance {
   raw: bigint | undefined
@@ -30,9 +31,14 @@ export function useArcBalance(address: `0x${string}` | undefined): ArcBalance {
     chainId,
     query: {
       enabled: !!address,
-      refetchInterval: 15_000,
+      staleTime: 3_000,
+      refetchInterval: BALANCE_REFRESH_INTERVAL,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: 'always',
+      refetchOnReconnect: 'always',
     },
   })
+  const refresh = useWalletBalanceRefresh(refetch, address, chainId)
 
   let amount: Amount | undefined
   try {
@@ -53,7 +59,7 @@ export function useArcBalance(address: `0x${string}` | undefined): ArcBalance {
     amount,
     isLoading,
     isError,
-    refetch: () => { void refetch() },
+    refetch: refresh,
   }
 }
 
