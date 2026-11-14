@@ -21,6 +21,7 @@ import {
   Coins,
   ExternalLink,
   Route,
+  Bitcoin,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { sanitizeTxValue, type ArcTransaction } from '../../hooks/useArcTransactions'
@@ -240,6 +241,7 @@ export function DashboardScreen({
           {/* Currency signs watermark the balance without competing with it. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 select-none overflow-hidden">
             <span className="absolute -left-3 top-1 text-[132px] font-light leading-none" style={{ color: 'var(--accent)', opacity: 0.055, transform: 'rotate(-14deg)' }}>$</span>
+            <Bitcoin aria-label="Bitcoin sign" size={140} strokeWidth={0.65} className="absolute left-1/2 top-5" style={{ color: 'var(--accent)', opacity: 0.05, transform: 'translateX(-50%) rotate(-6deg)' }} />
             <span className="absolute -right-2 top-9 text-[148px] font-light leading-none" style={{ color: 'var(--ink)', opacity: 0.045, transform: 'rotate(12deg)' }}>€</span>
           </div>
           {/* Subtle atmospheric ambient glow */}
@@ -253,10 +255,6 @@ export function DashboardScreen({
           />
 
           <div className="relative z-10 flex flex-col items-center text-center">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--subtle)' }}>
-              Arc stablecoin value
-            </span>
-
             {/* Big Net Worth Value */}
             <div className="my-2.5 flex items-baseline justify-center gap-1">
               <span className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>

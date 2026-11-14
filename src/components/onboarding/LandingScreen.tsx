@@ -1,7 +1,9 @@
 import { PageBackground } from '../shared/PageBackground'
 import { useWallet } from '../../context/WalletContext'
 import { motion } from 'framer-motion'
-import { ArrowRight, Shield, Zap, Globe } from 'lucide-react'
+import { ArrowRight, ShieldCheck } from 'lucide-react'
+import TokenUSDC from '@web3icons/react/icons/tokens/TokenUSDC'
+import NetworkArc from '@web3icons/react/icons/networks/NetworkArc'
 import { spectral } from '../shared/GlassCard'
 import { InterLogo } from '../shared/InterLogo'
 
@@ -48,22 +50,13 @@ export function LandingScreen() {
           </motion.h1>
 
           <motion.p
-            className="mb-1 text-base font-normal"
+            className="mb-10 text-base font-normal"
             style={{ color: 'var(--muted)' }}
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            Your non-custodial wallet on
-          </motion.p>
-          <motion.p
-            className="mb-10 text-base font-semibold"
-            style={{ color: 'var(--accent)' }}
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.25 }}
-          >
-            Arc — where USDC is the gas
+            Your non-custodial wallet
           </motion.p>
 
           {/* Feature chips */}
@@ -74,23 +67,39 @@ export function LandingScreen() {
             transition={{ delay: 0.3 }}
           >
             {[
-              { icon: Shield, label: 'Self-custodial',  sub: 'You control your keys'  },
-              { icon: Zap,    label: 'USDC as gas',      sub: 'No ETH needed'          },
-              { icon: Globe,  label: 'Arc Network',      sub: 'Sub-second finality'    },
-            ].map(({ icon: Icon, label, sub }) => (
+              {
+                icon: <ShieldCheck size={27} strokeWidth={1.8} style={{ color: 'var(--success)', fill: 'rgba(16,185,129,0.12)' }} />,
+                label: 'Self-custodial', sub: 'You control your keys',
+                tint: 'rgba(16,185,129,0.10)',
+              },
+              {
+                icon: <TokenUSDC size={36} variant="branded" />,
+                label: 'USDC as gas', sub: 'No ETH needed',
+                tint: 'rgba(39,117,202,0.12)',
+              },
+              {
+                icon: <NetworkArc size={32} variant="mono" color="var(--ink)" />,
+                label: 'Arc Network', sub: 'Sub-second finality',
+                tint: 'rgba(129,140,248,0.12)',
+              },
+            ].map(({ icon, label, sub, tint }) => (
               <div
                 key={label}
-                className="flex items-center gap-3 rounded-2xl px-4 py-3"
+                className="flex items-center gap-3.5 rounded-2xl px-4 py-3"
                 style={{
-                  background: 'rgba(255,255,255,0.68)',
-                  border: '1px solid rgba(6,182,212,0.12)',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
                 }}
               >
                 <div
-                  className="flex size-9 items-center justify-center rounded-xl"
-                  style={{ background: 'rgba(6,182,212,0.10)' }}
+                  aria-hidden="true"
+                  className="flex size-12 shrink-0 items-center justify-center rounded-2xl"
+                  style={{
+                    background: tint,
+                    boxShadow: `inset 0 0 0 1px ${tint}`,
+                  }}
                 >
-                  <Icon className="size-4" style={{ color: 'var(--accent-light)' }} />
+                  {icon}
                 </div>
                 <div className="text-left">
                   <p className="text-sm font-semibold" style={{ color: 'var(--ink)' }}>
