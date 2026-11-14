@@ -1,9 +1,9 @@
-import { http } from 'viem'
+import { createTowerTransport } from './towerRpc'
 
 const proxyBase = (import.meta.env.VITE_TOWER_PROXY_URL as string | undefined)?.replace(/\/$/, '') ?? ''
 
 export const towerUrl = (path: string) => `${proxyBase}/api/tower${path}`
-export const towerTransport = (chainId: number) => http(towerUrl(`/rpc/${chainId}`), { timeout: 30_000, retryCount: 0 })
+export const towerTransport = (chainId: number) => createTowerTransport(towerUrl(`/rpc/${chainId}`))
 
 export async function towerRequest<T>(path: string, payload?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(towerUrl(path), {

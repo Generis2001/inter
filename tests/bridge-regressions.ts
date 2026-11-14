@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { webcrypto } from 'node:crypto'
-import { concatHex, padHex, toHex, type Address } from 'viem'
+import { BaseError, HttpRequestError, concatHex, createPublicClient, padHex, toHex, type Address } from 'viem'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { createElement } from 'react'
 import { getRecordedTransactions, recordTransaction, transactionHistoryKey, type ArcTransaction } from '../src/utils/transactionHistory'
@@ -15,6 +15,8 @@ import { Amount } from '../src/onchain-money'
 import { getTokens, getTokenAddress, CIRBTC_MAINNET_ADDRESS, CIRBTC_TESTNET_ADDRESS } from '../src/utils/tokens'
 import { formatTokenBalance } from '../src/utils/tokenAmounts'
 import { formatTransactionValue, sanitizeTxValue } from '../src/hooks/useArcTransactions'
+import { createTowerTransport } from '../src/services/towerRpc'
+import { bridgeErrorMessage, savedBridgeError } from '../src/utils/bridgeErrors'
 
 const values = new Map<string, string>()
 Object.defineProperty(globalThis, 'localStorage', { value: { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key) } })
@@ -151,4 +153,93 @@ test('existing vault encryption stays compatible with the PIN flow', async () =>
   const encrypted = await encryptVault(data, '123456')
   assert.deepEqual(await decryptVault(encrypted, '123456'), data)
   await assert.rejects(decryptVault(encrypted, '654321'))
+})
+
+test('parallel bridge reads are batched and retry one temporary HTTP failure', async () => {
+  const original = globalThis.fetch
+  const requests: { method: string; id: number }[][] = []
+  globalThis.fetch = async (_url, options) => {
+    const calls = JSON.parse(options!.body as string) as { method: string; id: number }[]
+    requests.push(calls)
+    if (requests.length === 1) return Response.json({ error: 'Temporary upstream failure' }, { status: 503 })
+    return Response.json(calls.map(call => ({ jsonrpc: '2.0', id: call.id, result: call.method === 'eth_chainId' ? '0x13b2' : '0x10' })))
+  }
+  try {
+    const client = createPublicClient({ transport: createTowerTransport('https://bridge-proxy.invalid/api/tower/rpc/5042') })
+    const result = await Promise.all([client.getChainId(), client.getBlockNumber(), client.getBalance({ address: wallet })])
+    assert.deepEqual(result, [5042, 16n, 16n])
+    assert.equal(requests.length, 2)
+    assert.equal(requests[0].length, 3)
+    assert.deepEqual(requests[1].map(call => call.method), requests[0].map(call => call.method))
+  } finally { globalThis.fetch = original }
+})
+
+test('lost broadcast responses never trigger an automatic send or batch', async () => {
+  const original = globalThis.fetch
+  const requests: { method: string; params: string[] }[] = []
+  globalThis.fetch = async (_url, options) => {
+    requests.push(JSON.parse(options!.body as string) as { method: string; params: string[] })
+    return Response.json({ error: 'Response lost after accepting transaction' }, { status: 502 })
+  }
+  try {
+    const client = createPublicClient({ transport: createTowerTransport('https://bridge-proxy.invalid/api/tower/rpc/5042') })
+    await assert.rejects(client.request({ method: 'eth_sendRawTransaction', params: ['0x1234'] }), error => {
+      assert.match(bridgeErrorMessage(error), /HTTP 502/)
+      return true
+    })
+    assert.equal(requests.length, 1)
+    assert.equal(Array.isArray(requests[0]), false)
+    assert.equal(requests[0].method, 'eth_sendRawTransaction')
+    assert.deepEqual(requests[0].params, ['0x1234'])
+  } finally { globalThis.fetch = original }
+})
+
+test('read retries are bounded and do not retry rejected access or contract reverts', async () => {
+  const original = globalThis.fetch
+  try {
+    for (const status of [503, 403]) {
+      let requests = 0
+      globalThis.fetch = async () => { requests++; return Response.json({ error: 'Unavailable' }, { status }) }
+      const client = createPublicClient({ transport: createTowerTransport(`https://bridge-proxy.invalid/${status}`) })
+      await assert.rejects(client.getChainId())
+      assert.equal(requests, status === 503 ? 2 : 1)
+    }
+    let requests = 0
+    globalThis.fetch = async (_url, options) => {
+      requests++
+      const calls = JSON.parse(options!.body as string) as { id: number }[]
+      return Response.json(calls.map(call => ({ jsonrpc: '2.0', id: call.id, error: { code: 3, message: 'execution reverted: paused' } })))
+    }
+    const client = createPublicClient({ transport: createTowerTransport('https://bridge-proxy.invalid/revert') })
+    await assert.rejects(client.call({ to: wallet, data: '0x1234' }))
+    assert.equal(requests, 1)
+  } finally { globalThis.fetch = original }
+})
+
+test('a cancelled bridge read is not sent again after the retry delay', async () => {
+  const original = globalThis.fetch
+  const controller = new AbortController()
+  let requests = 0
+  globalThis.fetch = async () => {
+    requests++
+    setTimeout(() => controller.abort(), 20)
+    return Response.json({ error: 'Temporary failure' }, { status: 503 })
+  }
+  try {
+    const client = createPublicClient({ transport: createTowerTransport('https://bridge-proxy.invalid/cancelled') })
+    await assert.rejects(client.request({ method: 'eth_chainId' }, { signal: controller.signal }))
+    assert.equal(requests, 1)
+  } finally { globalThis.fetch = original }
+})
+
+test('saved bridge HTTP errors retain a useful status without exposing the signed payload', () => {
+  const error = new BaseError('The request failed.', { cause: new HttpRequestError({
+    url: 'https://private-proxy.invalid/rpc', status: 502, body: { method: 'eth_sendRawTransaction', params: ['0xsecretbytes'] },
+  }) })
+  const message = savedBridgeError(error, 'bridge')
+  assert.match(message, /HTTP 502/)
+  assert.match(message, /signed bridge is saved/)
+  assert.match(message, /Checking confirmation/)
+  assert.doesNotMatch(message, /private-proxy|secretbytes|Request body|try again/)
+  assert.equal(bridgeErrorMessage(new Error('This estimate expired. Review an updated estimate.')), 'This estimate expired. Review an updated estimate.')
 })

@@ -18,6 +18,7 @@ import { PinVerificationModal } from '../shared/PinVerificationModal'
 import { TokenIcon } from '../shared/TokenLogo'
 import { TowerLogo } from '../shared/TowerLogo'
 import { NetworkBadge } from '../shared/NetworkBadge'
+import { bridgeErrorMessage } from '../../utils/bridgeErrors'
 
 const card = { background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--ink)' }
 const muted = { color: 'var(--muted)' }
@@ -70,7 +71,7 @@ export function BridgeScreen() {
       void estimateBridge(sourceId, destinationId, account.address, raw, controller.signal).then(value => {
         if (generation.current === id && currentScope.current === scope) { setQuote(value); setQuoteError('') }
       }).catch((error: unknown) => {
-        if (!controller.signal.aborted && generation.current === id) setQuoteError(error instanceof Error ? error.message.split('\n')[0] : 'Bridge estimate unavailable.')
+        if (!controller.signal.aborted && generation.current === id) setQuoteError(bridgeErrorMessage(error))
       }).finally(() => { if (generation.current === id) setQuoting(false) })
     }, 400)
     return () => { ++generation.current; controller.abort(); clearTimeout(timer) }
@@ -106,7 +107,7 @@ export function BridgeScreen() {
     try {
       const fresh = await estimateBridge(operation.sourceChainId, operation.destinationChainId, operation.wallet, BigInt(operation.amountRaw))
       if (requestedScope === currentScope.current) setReview({ quote: fresh, existingId: operation.id })
-    } catch (error) { toast.error(error instanceof Error ? error.message.split('\n')[0] : 'Estimate unavailable.') }
+    } catch (error) { toast.error(bridgeErrorMessage(error)) }
   }
 
   const reviewReceiving = async (operation: BridgeOperation) => {
@@ -116,7 +117,7 @@ export function BridgeScreen() {
       const receiving = await estimateReceiving(operation)
       if (receiving.nativeBalance < receiving.gas) throw new Error(`Add ${getBridgeChain(operation.destinationChainId).chain.nativeCurrency.symbol} on ${getBridgeChain(operation.destinationChainId).chain.name} for gas.`)
       if (requestedScope === currentScope.current) setReview({ operation, receiving })
-    } catch (error) { toast.error(error instanceof Error ? error.message.split('\n')[0] : 'Receiving estimate unavailable.') }
+    } catch (error) { toast.error(bridgeErrorMessage(error)) }
     finally { setCheckingReceive(false) }
   }
 
@@ -185,6 +186,7 @@ export function BridgeScreen() {
         <p className="mt-3 text-xs font-bold" style={{ color: operation.status === 'failed' ? 'var(--danger)' : 'var(--accent)' }}>{STATUS[operation.status]}</p>
         {operation.error && <p className="mt-2 break-words text-xs" style={muted}>{operation.error}</p>}
         <div className="mt-3 flex flex-wrap gap-3 text-xs" style={{ color: 'var(--accent)' }}>
+          {operation.approvalHash && <a href={buildTxExplorerUrl(operation.sourceChainId, operation.approvalHash)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">Approval transaction<ExternalLink className="size-3" /></a>}
           {operation.sourceHash && <a href={buildTxExplorerUrl(operation.sourceChainId, operation.sourceHash)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">Source transaction<ExternalLink className="size-3" /></a>}
           {operation.destinationHash && <a href={buildTxExplorerUrl(operation.destinationChainId, operation.destinationHash)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">Receiving transaction<ExternalLink className="size-3" /></a>}
         </div>

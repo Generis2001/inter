@@ -11,6 +11,7 @@ import { getBridgeOperations, saveBridgeOperation, isBridgePending, type BridgeO
 import { recordTransaction } from '../utils/transactionHistory'
 import { recordKnownSpender } from '../utils/allowances'
 import { Amount } from '../onchain-money'
+import { bridgeConnectionError, bridgeErrorMessage, savedBridgeError } from '../utils/bridgeErrors'
 
 interface BridgeContextValue {
   operations: BridgeOperation[]
@@ -107,7 +108,7 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       const name = (error as { name?: string }).name ?? ''
       if (!name.includes('TransactionReceiptNotFound')) {
-        const message = error instanceof Error ? error.message.split('\n')[0] : 'Tracking unavailable. Your bridge is saved.'
+        const message = `${bridgeErrorMessage(error)} Your bridge is saved; tracking will retry automatically.`
         if (operation.error !== message) update(operation, { error: message })
       }
     } finally { tracking.current.delete(operation.id) }
@@ -177,8 +178,14 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
       // same transaction, so a lost response cannot cause a second burn.
       await client.sendRawTransaction({ serializedTransaction: signed })
     } catch (error) {
-      const message = error instanceof Error ? error.message.split('\n')[0] : 'Bridge submission failed.'
+      const saved = operation?.sourceSignedTransaction ? 'bridge' : operation?.approvalSignedTransaction ? 'approval' : undefined
+      const interrupted = !!saved && !!bridgeConnectionError(error)
+      const message = interrupted ? savedBridgeError(error, saved) : bridgeErrorMessage(error)
       if (operation) update(operation, { error: message, status: operation.sourceHash ? 'source-pending' : operation.status === 'failed' ? 'failed' : operation.approvalHash || operation.status === 'ready-to-submit' ? operation.status : 'failed' })
+      if (interrupted) {
+        toast.info(`Signed ${saved} saved. Checking ${getBridgeChain(quote.sourceChainId).chain.name} confirmation.`)
+        return
+      }
       throw new Error(message)
     } finally { signing.current = false; setBusy(false); void refresh() }
   }
@@ -208,8 +215,13 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
       operation = update(operation, { destinationHash: keccak256(signed), destinationSignedTransaction: signed, status: 'destination-pending', error: undefined })
       await client.sendRawTransaction({ serializedTransaction: signed })
     } catch (error) {
-      const message = error instanceof Error ? error.message.split('\n')[0] : 'Destination transaction failed.'
+      const interrupted = !!operation?.destinationSignedTransaction && !!bridgeConnectionError(error)
+      const message = interrupted ? savedBridgeError(error, 'receiving transaction') : bridgeErrorMessage(error)
       if (operation) update(operation, { error: message })
+      if (interrupted) {
+        toast.info('Receiving transaction saved. Checking confirmation.')
+        return
+      }
       throw new Error(message)
     } finally { signing.current = false; setBusy(false); void refresh() }
   }
@@ -222,9 +234,15 @@ export function BridgeProvider({ children }: { children: ReactNode }) {
     if (!signed) throw new Error('No signed transaction is available. Refresh bridge tracking.')
     const destination = !!latest.destinationSignedTransaction
     const client = bridgeClient(destination ? latest.destinationChainId : latest.sourceChainId)
-    await client.sendRawTransaction({ serializedTransaction: signed })
-    update(latest, { error: undefined })
-    void refresh()
+    try {
+      await client.sendRawTransaction({ serializedTransaction: signed })
+      update(latest, { error: undefined })
+    } catch (error) {
+      const transaction = destination ? 'receiving transaction' : latest.sourceSignedTransaction ? 'bridge' : 'approval'
+      const message = bridgeConnectionError(error) ? savedBridgeError(error, transaction) : bridgeErrorMessage(error)
+      update(latest, { error: message })
+      throw new Error(message)
+    } finally { void refresh() }
   }
 
   return <BridgeContext.Provider value={{ operations, busy, submit, complete, retryBroadcast, refresh }}>{children}</BridgeContext.Provider>
